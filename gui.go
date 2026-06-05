@@ -93,7 +93,7 @@ func (g *gui) buildUI() {
 
 	g.logW = widget.NewMultiLineEntry()
 	g.logW.SetMinRowsVisible(8)
-	g.logW.Disable()
+	g.logW.Wrapping = fyne.TextWrapWord
 	logCard := widget.NewCard("", "Log", g.logW)
 
 	split := container.NewVSplit(questCard, logCard)

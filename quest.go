@@ -323,16 +323,22 @@ func rnd(a, b int) int {
 func runVideo(client *DiscordClient, questID string, task TaskInfo) {
 	out("  ▶ VIDEO (%.0f/%.0f s)", task.Done, task.Target)
 	cur := task.Done
-	step := 30.0
 	fails := 0
 	progressKey := task.Key
+	started := time.Now()
 
 	for cur < task.Target {
-		sendVal := cur + step
-		if sendVal > task.Target {
-			sendVal = task.Target
+		elapsed := time.Since(started).Seconds()
+		maxAllowed := elapsed + 10
+		speed := 7.0
+		timestamp := cur + speed
+		if timestamp > maxAllowed {
+			timestamp = maxAllowed
 		}
-		prog, term, err := client.SendVideoProgress(questID, sendVal, progressKey)
+		if timestamp > task.Target {
+			timestamp = task.Target
+		}
+		prog, term, err := client.SendVideoProgress(questID, timestamp, progressKey)
 		if err != nil {
 			if term {
 				out("  ✗ %v", err)
@@ -350,6 +356,8 @@ func runVideo(client *DiscordClient, questID string, task TaskInfo) {
 		fails = 0
 		if prog > cur {
 			cur = prog
+		} else if timestamp > cur {
+			cur = timestamp
 		}
 		out("  ✓ %.0f/%.0f (%.0f%%)", cur, task.Target, cur/task.Target*100)
 		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
@@ -358,7 +366,7 @@ func runVideo(client *DiscordClient, questID string, task TaskInfo) {
 			out("  ✓ VIDEO completo!")
 			return
 		}
-		time.Sleep(time.Duration(rnd(1200, 1800)) * time.Millisecond)
+		time.Sleep(time.Duration(rnd(7000, 9500)) * time.Millisecond)
 	}
 }
 
@@ -371,7 +379,7 @@ func runActivity(client *DiscordClient, questID string, task TaskInfo, channelID
 	if ch == "" {
 		ch = "0"
 	}
-	streamKey := fmt.Sprintf("call:%s:%d", ch, rnd(1000, 9999))
+	streamKey := fmt.Sprintf("call:%s:1", ch)
 	dbg("runActivity: stream_key=%s", streamKey)
 	cur := task.Done
 	fails := 0
@@ -427,7 +435,7 @@ func runAchievement(client *DiscordClient, questID string, task TaskInfo, channe
 	if ch == "" {
 		ch = "0"
 	}
-	streamKey := fmt.Sprintf("call:%s:%d", ch, rnd(1000, 9999))
+	streamKey := fmt.Sprintf("call:%s:1", ch)
 	dbg("runAchievement: stream_key=%s", streamKey)
 	cur := task.Done
 	fails := 0
@@ -457,6 +465,8 @@ func runAchievement(client *DiscordClient, questID string, task TaskInfo, channe
 		out("  ✓ progresso: %.0f/%.0f", cur, task.Target)
 		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
 		if cur >= task.Target || term {
+			dbg("runAchievement: completo, a enviar terminal heartbeat")
+			client.SendHeartbeat(questID, streamKey)
 			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
 			out("  ✓ ACHIEVEMENT completo!")
 			return
