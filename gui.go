@@ -180,7 +180,17 @@ func (g *gui) onRefresh() {
 func (g *gui) auth() (*DiscordClient, error) {
 	token, err := findDiscordToken()
 	if err != nil {
-		return nil, fmt.Errorf("token não encontrado. Abre Discord (Ctrl+Shift+I), console, cola o comando abaixo e guarda o resultado em token.txt:\n\n(webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())")
+		return nil, fmt.Errorf(`token não encontrado.
+
+1. Abre o Discord, Ctrl+Shift+I, tab Console
+2. Cola um destes comandos:
+
+   (webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())
+
+   Se der undefined, tenta:
+   (function(){const w=webpackChunkdiscord_app.push([[],{},r=>r]);delete w.default;const m=Object.values(w.c).find(m=>m?.exports?.default?.getToken);return m?.exports?.default?.getToken()})()
+
+3. Guarda o resultado em token.txt e reabre o programa`)
 	}
 	client := NewDiscordClient(token)
 	if err := client.Verify(); err != nil {

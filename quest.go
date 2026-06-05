@@ -571,8 +571,8 @@ func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 		}
 	}
 
-	exePath := strings.ToLower(strings.ReplaceAll(appName, ":", "")) + "/" + exeName
-	exePath = strings.ReplaceAll(exePath, " ", " ")
+	exePath := strings.ToLower(strings.ReplaceAll(appName, ":", " ")) + "/" + exeName
+	exePath = strings.Join(strings.Fields(exePath), " ")
 	out("  → ExePath: %s", exePath)
 
 	sessionID := newSessionID()

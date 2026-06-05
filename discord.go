@@ -51,7 +51,11 @@ func (c *DiscordClient) do(method, path string, body any) (*http.Response, error
 		}
 		req.Header.Set("Authorization", c.token)
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Discord/1.0")
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) discord/1.0.9240 Chrome/138.0.7204.251 Electron/37.6.0 Safari/537.36")
+		req.Header.Set("Origin", "https://discord.com")
+		req.Header.Set("x-discord-locale", "pt-BR")
+		req.Header.Set("x-debug-options", "bugReporterEnabled")
+		req.Header.Set("x-super-properties", "eyJvcyI6IldpbmRvd3MiLCJicm93c2VyIjoiRGlzY29yZCBDbGllbnQiLCJyZWxlYXNlX2NoYW5uZWwiOiJzdGFibGUiLCJjbGllbnRfdmVyc2lvbiI6IjEuMC45MjQwIiwib3NfdmVyc2lvbiI6IjEwLjAuMjYyMDAiLCJvc19hcmNoIjoieDY0IiwiYXBwX2FyY2giOiJ4NjQiLCJzeXN0ZW1fbG9jYWxlIjoiZW4tVVMiLCJoYXNfY2xpZW50X21vZHMiOmZhbHNlLCJjbGllbnRfbGF1bmNoX2lkIjoiMTIyNDIwNDctNDFmYy00NGRjLTllZDQtMmI5MTQ3MzI2OTQxIiwiYnJvd3Nlcl91c2VyX2FnZW50IjoiTW96aWxsYS81LjAgKFdpbmRvd3MgTlQgMTAuMDsgV2luNjQ7IHg2NCkgQXBwbGVXZWJLaXQvNTM3LjM2IChLSFRNTCwgbGlrZSBHZWNrbykgZGlzY29yZC8xLjAuOTI0MCBDaHJvbWUvMTM4LjAuNzIwNC4yNTEgRWxlY3Ryb24vMzcuNi4wIFNhZmFyaS81MzcuMzYiLCJicm93c2VyX3ZlcnNpb24iOiIzNy42LjAiLCJvc19zZGtfdmVyc2lvbiI6IjI2MjAwIiwiY2xpZW50X2J1aWxkX251bWJlciI6NTU2OTY5LCJuYXRpdmVfYnVpbGRfbnVtYmVyIjo4MzQzMiwiY2xpZW50X2V2ZW50X3NvdXJjZSI6bnVsbCwibGF1bmNoX3NpZ25hdHVyZSI6ImE1Nzc2ZWM2LTk1NWItNDEyZS05MDU4LWJkMmI5MjhlZTczNyIsImNsaWVudF9oZWFydGJlYXRfc2Vzc2lvbl9pZCI6IjZkMmM3YTYzLTNhZmYtNDU5Zi1hNmJjLTk5NzgwNzk3YjNjMSIsImNsaWVudF9hcHBfc3RhdGUiOiJ1bmZvY3VzZWQifQ==")
 		resp, err := c.http.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("http.Do: %w", err)

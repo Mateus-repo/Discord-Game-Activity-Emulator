@@ -9,32 +9,38 @@ import (
 )
 
 var (
-	tokenRegex    = regexp.MustCompile(`[a-zA-Z0-9_-]{24}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{27,}`)
+	tokenRegex    = regexp.MustCompile(`[a-zA-Z0-9_-]{24,26}\.[a-zA-Z0-9_-]{6}\.[a-zA-Z0-9_-]{27,}`)
 	mfaTokenRegex = regexp.MustCompile(`mfa\.[a-zA-Z0-9_-]{84,}`)
-	maxReadSize   = 10 * 1024 * 1024 // 10 MB per file
 )
 
+const tokenFile = "token.txt"
+
 func findDiscordToken() (string, error) {
-	if tok := readTokenFile("token.txt"); tok != "" {
-		dbg("token lido de token.txt")
+	if tok := readTokenFile(tokenFile); tok != "" {
+		dbg("token lido de %s", tokenFile)
 		return tok, nil
 	}
 
-	dirs := []string{
+	searchPaths := []string{
 		filepath.Join(os.Getenv("APPDATA"), "discord", "Local Storage", "leveldb"),
 		filepath.Join(os.Getenv("APPDATA"), "discordcanary", "Local Storage", "leveldb"),
 		filepath.Join(os.Getenv("APPDATA"), "discordptb", "Local Storage", "leveldb"),
+		filepath.Join(os.Getenv("LOCALAPPDATA"), "discord", "Local Storage", "leveldb"),
+		filepath.Join(os.Getenv("LOCALAPPDATA"), "discordcanary", "Local Storage", "leveldb"),
+		filepath.Join(os.Getenv("LOCALAPPDATA"), "discordptb", "Local Storage", "leveldb"),
 	}
 
-	for _, dir := range dirs {
+	for _, dir := range searchPaths {
 		tok, err := scanDir(dir)
 		if err == nil && tok != "" {
 			dbg("token encontrado em %s", dir)
+			saveToken(tok)
 			return tok, nil
 		}
 		dbg("token não encontrado em %s: %v", dir, err)
 	}
-	return "", fmt.Errorf("token não encontrado. Discord instalado e com sessão iniciada? Use --token para fornecer manualmente")
+
+	return "", fmt.Errorf("token não encontrado.")
 }
 
 func readTokenFile(path string) string {
@@ -50,6 +56,17 @@ func readTokenFile(path string) string {
 		return ""
 	}
 	return s
+}
+
+func saveToken(tok string) {
+	if readTokenFile(tokenFile) != "" {
+		return
+	}
+	if err := os.WriteFile(tokenFile, []byte(tok+"\n"), 0644); err != nil {
+		dbg("saveToken: erro ao guardar: %v", err)
+		return
+	}
+	dbg("token guardado em %s", tokenFile)
 }
 
 func scanDir(dir string) (string, error) {
@@ -71,15 +88,11 @@ func scanDir(dir string) (string, error) {
 			dbg("scanDir: stat %s: %v", name, err)
 			continue
 		}
-		if fi.Size() > int64(maxReadSize)*10 { // >100 MB → skip
+		if fi.Size() > 100*1024*1024 {
 			dbg("scanDir: %s demasiado grande (%d MB), a ignorar", name, fi.Size()/1024/1024)
 			continue
 		}
-		size := fi.Size()
-		if size > int64(maxReadSize) {
-			size = int64(maxReadSize)
-		}
-		data := make([]byte, size)
+		data := make([]byte, fi.Size())
 		f, err := os.Open(fpath)
 		if err != nil {
 			dbg("scanDir: open %s: %v", name, err)
@@ -92,11 +105,9 @@ func scanDir(dir string) (string, error) {
 			continue
 		}
 		if m := mfaTokenRegex.Find(data); m != nil {
-			dbg("scanDir: mfa token found in %s", name)
 			return string(m), nil
 		}
 		if m := tokenRegex.Find(data); m != nil {
-			dbg("scanDir: token found in %s", name)
 			return string(m), nil
 		}
 	}

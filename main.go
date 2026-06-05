@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -14,6 +15,8 @@ func main() {
 	tokenFlag := flag.String("token", "", "token do Discord (auto se omitido)")
 	questID := flag.String("id", "", "ID específico de quest para processar")
 	channelID := flag.String("channel", "", "ID do voice channel para heartbeats")
+	stopDesktop := flag.String("stop-desktop", "", "enviar terminal heartbeat para quest PLAY_ON_DESKTOP (formato: questID,appID,exePath)")
+	printToken := flag.Bool("print-token", false, "extrair e imprimir o token (útil para verificar)")
 	flag.Parse()
 
 	if *debugPtr {
@@ -22,6 +25,33 @@ func main() {
 
 	if *dummyRunner {
 		runDummyRunner()
+		return
+	}
+
+	if *printToken {
+		token, err := findDiscordToken()
+		if err != nil {
+			fmt.Println("✗", err)
+			manualInstructions()
+			os.Exit(1)
+		}
+		client := NewDiscordClient(token)
+		if err := client.Verify(); err != nil {
+			fmt.Println("✗ Token inválido:", err)
+			os.Exit(1)
+		}
+		fmt.Println("✓ Token válido —", client.user)
+		fmt.Println("Token:", token[:30]+"...")
+		return
+	}
+
+	if *stopDesktop != "" {
+		parts := strings.SplitN(*stopDesktop, ",", 3)
+		if len(parts) != 3 {
+			fmt.Println("Formato: questID,appID,exePath")
+			os.Exit(1)
+		}
+		stopDesktopHeartbeat(parts[0], parts[1], parts[2])
 		return
 	}
 
@@ -43,11 +73,7 @@ func runCLI(tokenArg, questID, channelID string) {
 		token, err = findDiscordToken()
 		if err != nil {
 			fmt.Println("✗", err)
-			fmt.Println("\nObtém o token manualmente:")
-			fmt.Println("1. Abre Discord (Ctrl+Shift+I)")
-			fmt.Println("2. Vai à tab Console")
-			fmt.Println(`3. Cola: (webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())`)
-			fmt.Println("4. Guarda o resultado em token.txt ou usa --token <token>")
+			manualInstructions()
 			os.Exit(1)
 		}
 		fmt.Println("✓ Token encontrado")
@@ -183,4 +209,41 @@ func runDummyRunner() {
 	for {
 		time.Sleep(24 * time.Hour)
 	}
+}
+
+func manualInstructions() {
+	fmt.Println(`Para obter o token manualmente:`)
+	fmt.Println()
+	fmt.Println(`Método 1 — Abre o Discord, carrega Ctrl+Shift+I, vai à tab Console e cola:`)
+	fmt.Println(`  (webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())`)
+	fmt.Println()
+	fmt.Println(`Se der "undefined", tenta este:`)
+	fmt.Println(`  (function(){const w=webpackChunkdiscord_app.push([[],{},r=>r]);delete w.default;const m=Object.values(w.c).find(m=>m?.exports?.default?.getToken);return m?.exports?.default?.getToken()})()`)
+	fmt.Println()
+	fmt.Println(`Método 2 — Abre o Discord, carrega Ctrl+Shift+I, vai à tab Application > Local Storage > discord.com e copia o valor de "token"`)
+	fmt.Println()
+	fmt.Println(`Depois de obteres o token, guarda-o em token.txt ou usa --token <token>`)
+	fmt.Println()
+	fmt.Println(`Dica: Se o Discord estiver aberto e funcionar, muitas vezes basta fechar e abrir o programa que ele encontra automaticamente.`)
+}
+
+func stopDesktopHeartbeat(questID, appID, exePath string) {
+	token, err := findDiscordToken()
+	if err != nil {
+		fmt.Println("✗", err)
+		os.Exit(1)
+	}
+	client := NewDiscordClient(token)
+	if err := client.Verify(); err != nil {
+		fmt.Println("✗", err)
+		os.Exit(1)
+	}
+	fmt.Println("✓ Autenticado como", client.user)
+	fmt.Println("  → A enviar terminal heartbeat...")
+	_, _, err = client.SendDesktopHeartbeat(questID, appID, exePath, true)
+	if err != nil {
+		fmt.Println("  ✗", err)
+		os.Exit(1)
+	}
+	fmt.Println("  ✓ Terminal heartbeat enviado!")
 }
