@@ -2,24 +2,26 @@
 
 Completa automaticamente **Quests do Discord** que recompensam **Orbs** — sem precisar instalar ou abrir os jogos reais.
 
-Standalone `.exe`, sem dependências.
+Standalone `.exe` (compilação requer CGO/MinGW-w64).
 
 ## Funcionalidades
 
 - ✅ **WATCH_VIDEO** — envia progresso de visualização direto à API
 - ✅ **PLAY_ACTIVITY** — heartbeats com `stream_key`
 - ✅ **PLAY_ON_DESKTOP** — heartbeats diretos via API (com `application_id` + `executable_path`)
-- ✅ **ACHIEVEMENT_IN_ACTIVITY** — heartbeat com progresso manual
+- ✅ **ACHIEVEMENT_IN_ACTIVITY** — heartbeat com progresso manual (pode falhar; se após 5 tentativas não funcionar, completa manualmente no Discord)
 - ✅ **Auto-enroll** — inscreve-se automaticamente nas quests
 - ✅ **Auto-claim** — reclama a recompensa quando completa
 - ✅ **Extração automática do token** — lê dos ficheiros do Discord (ou manual com `--token`)
 - ✅ **Pronto para qualquer PC** — só copiar o `.exe`, o token é auto-extraído e guardado em `token.json`
+- ✅ **Descoberta automática de voice channel** — para quests ACTIVITY/ACHIEVEMENT, encontra um voice channel automaticamente se `--channel` não for fornecido
+- ✅ **Deteção de CAPTCHA** — avisa se a recompensa exigir verificação manual
 - ❌ **STREAM_ON_DESKTOP** — não suportado (requer injeção no cliente)
 
 ## Como funciona
 
 1. Extrai o token de autenticação dos ficheiros locais do Discord (ou usa `--token`)
-2. Consulta `GET /users/@me/quests` para listar as quests ativas
+2. Consulta `GET /quests/@me` para listar as quests ativas
 3. Para cada quest faz enroll, processa as tarefas e faz claim automático
 4. **PLAY_ON_DESKTOP**: envia heartbeats diretos (`POST /quests/{id}/heartbeat`) com a mesma estrutura que o cliente Discord usa — sem precisar de processos dummy ou jogos instalados
 
@@ -51,12 +53,44 @@ discord-quest-emulator.exe --cli --debug
 | `--token <token>` | Fornecer token manualmente |
 | `--channel <id>` | ID do voice channel para PLAY_ACTIVITY |
 | `--debug` | Logs detalhados |
-| `--print-token` | Verificar token e mostrar conta associada |
+| `--print-token` | Verificar token (também atualiza `token.json` com o nome da conta) |
 | `--stop-desktop <q,a,e>` | Enviar heartbeat terminal para uma quest PLAY_ON_DESKTOP (formato: `questID,appID,exePath`) |
+| `--dummy-runner` | Uso interno — iniciado pelo programa para simular processo de jogo |
+
+## Modo Gráfico (GUI)
+
+Por omissão (sem `--cli`), o programa abre uma interface gráfica com:
+
+- **Cartão de autenticação** — mostra se o token foi encontrado ou se é necessário extração manual
+- **Lista de quests** — cada quest aparece como um cartão com:
+  - Checkbox para selecionar (todas marcadas por defeito)
+  - Nome em negrito
+  - Ícone do tipo de tarefa: `▶` WATCH_VIDEO, `🖥` PLAY_ON_DESKTOP, `🎮` PLAY_ACTIVITY, `🏆` ACHIEVEMENT
+  - Barra de progresso
+  - Label de estado colorido: verde "Ativa", azul "Completa", cinza "Reclamada"
+- **Botão "Processar selecionadas"** — executa as quests marcadas
+- **Botão "Atualizar"** — recarrega a lista de quests
+- **Painel de log** — mostra o progresso em tempo real
+- **Estado do voice channel** — mostra se foi detetado automaticamente
 
 ## Sobre o token
 
-O token é **auto-extraído** dos ficheiros locais do Discord (`%APPDATA%/discord/Local Storage/leveldb/`). Quando encontrado, é guardado em `token.json` (formato `{"token": "...", "account": "..."}`) para usar de imediato nas próximas execuções.
+O token é **auto-extraído** dos ficheiros locais do Discord. O programa pesquisa em várias localizações:
+
+| Caminho | Variante |
+|---------|----------|
+| `%APPDATA%/discord/Local Storage/leveldb/` | Discord Stable |
+| `%APPDATA%/discordcanary/Local Storage/leveldb/` | Discord Canary |
+| `%APPDATA%/discordptb/Local Storage/leveldb/` | Discord PTB |
+| `%LOCALAPPDATA%/discord/Local Storage/leveldb/` | Discord Stable (instalação local) |
+| `%LOCALAPPDATA%/discordcanary/Local Storage/leveldb/` | Discord Canary (instalação local) |
+| `%LOCALAPPDATA%/discordptb/Local Storage/leveldb/` | Discord PTB (instalação local) |
+
+São lidos ficheiros `.ldb` e `.log` à procura de tokens (incluindo **tokens MFA** com o formato `mfa.xxxx`). Ficheiros com mais de 100 MB são ignorados.
+
+Quando encontrado, o token é guardado em `token.json` (formato `{"token": "...", "account": "..."}`) para usar de imediato nas próximas execuções. O `token.json` é **atualizado automaticamente** em cada execução bem-sucedida com o nome da conta.
+
+Se `token.json` não existir, o programa verifica também um ficheiro `token.txt` legado.
 
 `token.json` está no `.gitignore` — nunca é commitado.
 
@@ -124,13 +158,15 @@ Quests encontradas (2):
 
 ## Compilar
 
-Requer Go 1.22+ e MinGW-w64 (para CGO).
+Requer Go 1.22+ e MinGW-w64 (para CGO — necessário para a GUI Fyne).
 
 ```bash
 git clone https://github.com/Mateus-repo/Discord-Game-Activity-Emulator.git
 cd Discord-Game-Activity-Emulator
 build.bat
 ```
+
+> ⚠️ A primeira compilação pode demorar 5–10 minutos (descarrega dependências e compila a Fyne).
 
 ## Script de captura
 
