@@ -483,27 +483,67 @@ func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 	pid := rnd(4000, 30000)
 	appID := task.AppID
 
-	streamKeys := []string{
-		"ineligible_platform",
-	}
+	var exeName, appName string
 	if appID != "" {
-		streamKeys = []string{
-			fmt.Sprintf("game:%s:%d", appID, pid),
-			fmt.Sprintf("desktop:%s:%d", appID, pid),
-			appID,
+		info, err := client.GetAppInfo(appID)
+		if err == nil {
+			if name, ok := info["name"].(string); ok {
+				appName = name
+			}
+			if exes, ok := info["executables"].([]any); ok {
+				for _, e := range exes {
+					if em, ok := e.(map[string]any); ok {
+						if os, ok := em["os"].(string); ok && os == "win32" {
+							if name, ok := em["name"].(string); ok {
+								exeName = name
+								break
+							}
+						}
+					}
+				}
+			}
+			if exeName != "" {
+				out("  → App: %s | EXE: %s", appName, exeName)
+			} else {
+				out("  → App: %s (ID: %s)", appName, appID)
+			}
 		}
 	}
-	dbg("runDesktop: stream_keys=%v", streamKeys)
 
+	streamKeys := []string{appID}
+	if exeName != "" {
+		cleanName := strings.ReplaceAll(exeName, ">", "")
+		cleanDir := strings.ToLower(appName)
+		if cleanDir == "" {
+			cleanDir = "game"
+		}
+		exePath := fmt.Sprintf("c:/program files/%s/%s", cleanDir, cleanName)
+		streamKeys = []string{
+			fmt.Sprintf("game:%s:%d", cleanName, pid),
+			fmt.Sprintf("game:%s:%d", exePath, pid),
+			fmt.Sprintf("game:%s:%d", appID, pid),
+			appID,
+		}
+	} else if appID != "" {
+		streamKeys = []string{
+			fmt.Sprintf("game:%s:%d", appID, pid),
+			appID,
+			"ineligible_platform",
+		}
+	} else {
+		streamKeys = []string{"ineligible_platform"}
+	}
+
+	dbg("runDesktop: stream_keys=%v", streamKeys)
 	var streamKey string
 	for _, sk := range streamKeys {
 		prog, term, err := client.SendHeartbeat(questID, sk)
 		if err != nil {
 			if term {
-				dbg("runDesktop: stream_key %s -> terminal error", sk)
+				dbg("runDesktop: stream_key '%s' -> terminal", sk)
 				continue
 			}
-			dbg("runDesktop: stream_key %s -> %v", sk, err)
+			dbg("runDesktop: stream_key '%s' -> %v", sk, err)
 			continue
 		}
 		streamKey = sk
@@ -518,8 +558,11 @@ func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 
 	if streamKey == "" {
 		out("  ✗ Nenhuma stream_key funciona para esta quest.")
-		out("  → Alternativa: Abre o Discord (Ctrl+Shift+I) > Console e usa o script em outros-scripts/script-1-funciona.txt")
-		out("    Ou executa o jogo real para completar a quest.")
+		if appID != "" {
+			out("  → Debug: appID=%s exeName=%s", appID, exeName)
+		}
+		out("  → Alternativa 1: Abre Discord (Ctrl+Shift+I) > Console e cola o script de outros-scripts/script-1-funciona.txt")
+		out("  → Alternativa 2: Executa o jogo real com o Discord aberto")
 		return
 	}
 
