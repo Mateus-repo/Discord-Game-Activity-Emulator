@@ -62,44 +62,50 @@ func startGUI() {
 
 func (g *gui) buildUI() {
 	title := canvas.NewText("Discord Quest Emulator", color.RGBA{0x58, 0x65, 0xF2, 0xFF})
-	title.TextSize = 20
+	title.TextSize = 22
 
 	g.statusLbl = widget.NewLabel("A iniciar...")
+	g.statusLbl.TextStyle = fyne.TextStyle{Monospace: true}
 
 	g.voiceLbl = widget.NewLabel("")
 	g.voiceLbl.Hide()
+	g.voiceLbl.TextStyle = fyne.TextStyle{Monospace: true}
 
-	authVBox := container.NewVBox(
-		widget.NewCard("", "Autenticação",
-			container.NewBorder(nil, nil, widget.NewLabel("Token:"), nil,
-				widget.NewLabel("(detetado automaticamente)"),
-			),
+	authCard := widget.NewCard("", "Autenticação",
+		container.NewHBox(
+			widget.NewLabel("Token:"),
+			widget.NewLabel("(lido de token.json / auto-extraído)"),
 		),
-		g.statusLbl,
-		g.voiceLbl,
 	)
 
 	g.questBox = container.NewVBox()
 	questScroll := container.NewScroll(g.questBox)
 	questScroll.SetMinSize(fyne.NewSize(0, 200))
 
-	g.processBtn = widget.NewButtonWithIcon("Processar", theme.MediaPlayIcon(), g.onProcess)
+	g.processBtn = widget.NewButtonWithIcon("Processar selecionadas", theme.MediaPlayIcon(), g.onProcess)
 	g.refreshBtn = widget.NewButtonWithIcon("Atualizar", theme.ViewRefreshIcon(), g.onRefresh)
 	controls := container.NewHBox(layout.NewSpacer(), g.processBtn, g.refreshBtn)
 
-	questCard := widget.NewCard("", "Quests",
+	questCard := widget.NewCard("", "Quests Ativas",
 		container.NewBorder(nil, controls, nil, nil, questScroll),
 	)
 
 	g.logW = widget.NewMultiLineEntry()
 	g.logW.SetMinRowsVisible(8)
 	g.logW.Wrapping = fyne.TextWrapWord
+	g.logW.Disable()
 	logCard := widget.NewCard("", "Log", g.logW)
 
 	split := container.NewVSplit(questCard, logCard)
+	split.SetOffset(0.65)
 
 	g.win.SetContent(container.NewBorder(
-		container.NewVBox(title, authVBox),
+		container.NewVBox(
+			container.NewHBox(title, layout.NewSpacer()),
+			authCard,
+			g.statusLbl,
+			g.voiceLbl,
+		),
 		nil, nil, nil,
 		split,
 	))
@@ -182,12 +188,27 @@ func (g *gui) auth() (*DiscordClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf(`token não encontrado.
 
-1. Abre o Discord, Ctrl+Shift+I
-2. Vai a Application > Local Storage > discord.com e copia o valor de "token"
-3. Guarda em token.json: {"token": "o-teu-token"} e reabre o programa
+1. Abre o Discord, Ctrl+Shift+I > tab Console
+2. Cola o seguinte e pressiona Enter:
 
-Se não encontrares, experimenta na tab Console:
-  localStorage.getItem("token")`)
+(function() {
+  const of = globalThis.fetch;
+  globalThis.fetch = async function(...a) {
+    const auth = new Headers(a[1]?.headers||{}).get('authorization');
+    if (auth) console.log('Token:', auth);
+    return of.apply(this, a);
+  };
+  const oo = XMLHttpRequest.prototype.open;
+  const os = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.open = function(m, u, ...r) { this._u = u; return oo.apply(this, [m, u, ...r]); };
+  XMLHttpRequest.prototype.setRequestHeader = function(h, v) {
+    if (h.toLowerCase() === 'authorization') console.log('Token:', v);
+    return os.apply(this, [h, v]);
+  };
+})()
+
+3. Clica num DM para gerar tráfego — o token aparece na Console
+4. Guarda em token.json: {"token": "o-teu-token"} e reabre o programa`)
 	}
 	client := NewDiscordClient(token)
 	if err := client.Verify(); err != nil {
@@ -223,6 +244,21 @@ func (g *gui) rebuildQuestList() {
 	g.questBox.Refresh()
 }
 
+func taskIcon(t QuestType) string {
+	switch t {
+	case PlayOnDesktop:
+		return "🖥"
+	case PlayActivity:
+		return "🎮"
+	case Achievement:
+		return "🏆"
+	case WatchVideo:
+		return "▶"
+	default:
+		return "?"
+	}
+}
+
 func (g *gui) makeQuestCard(item *questItem) *fyne.Container {
 	q := item.quest
 	us := q.UserStatus
@@ -230,7 +266,8 @@ func (g *gui) makeQuestCard(item *questItem) *fyne.Container {
 
 	var metaParts []string
 	for _, t := range item.tasks {
-		metaParts = append(metaParts, fmt.Sprintf("%s %.0f/%.0f", t.Type, t.Done, t.Target))
+		icon := taskIcon(t.Type)
+		metaParts = append(metaParts, fmt.Sprintf("%s %s %.0f/%.0f", icon, t.Type, t.Done, t.Target))
 	}
 
 	completed := us.Completed || us.CompletedAt != ""
@@ -244,41 +281,42 @@ func (g *gui) makeQuestCard(item *questItem) *fyne.Container {
 		item.check.SetChecked(true)
 	}
 
-	statusStr := ""
-	switch {
-	case claimed:
-		statusStr = "Reclamada"
-	case completed:
-		statusStr = "Completa"
-	default:
-		statusStr = "Ativa"
-	}
-
 	item.nameLbl = widget.NewLabel(name)
+	item.nameLbl.TextStyle = fyne.TextStyle{Bold: true}
 	item.bar = widget.NewProgressBar()
 
+	pct := 0.0
 	if completed || claimed {
-		item.bar.SetValue(1.0)
+		pct = 1.0
 	} else {
 		for _, t := range item.tasks {
 			if t.Target > 0 {
-				item.bar.SetValue(t.Done / t.Target)
+				pct = t.Done / t.Target
 				break
 			}
 		}
 	}
+	item.bar.SetValue(pct)
 
-	metaStr := strings.Join(metaParts, ", ")
-	if metaStr == "" {
-		metaStr = statusStr
-	} else {
-		metaStr += " — " + statusStr
-	}
+	metaStr := strings.Join(metaParts, "  ")
 	metaLbl := widget.NewLabel(metaStr)
 	metaLbl.TextStyle = fyne.TextStyle{Monospace: true}
+	metaLbl.Wrapping = fyne.TextWrapWord
+
+	statusColor := color.RGBA{0x3B, 0xA5, 0x5D, 0xFF}
+	statusStr := "Ativa"
+	if claimed {
+		statusColor = color.RGBA{0x88, 0x88, 0x88, 0xFF}
+		statusStr = "Reclamada"
+	} else if completed {
+		statusColor = color.RGBA{0x58, 0x65, 0xF2, 0xFF}
+		statusStr = "Completa"
+	}
+	statusLbl := canvas.NewText(statusStr, statusColor)
+	statusLbl.TextSize = 12
 
 	return container.NewVBox(widget.NewCard("", "", container.NewVBox(
-		container.NewHBox(item.check, item.nameLbl),
+		container.NewHBox(item.check, item.nameLbl, layout.NewSpacer(), statusLbl),
 		item.bar,
 		metaLbl,
 	)))

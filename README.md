@@ -64,16 +64,7 @@ O token é **auto-extraído** dos ficheiros locais do Discord (`%APPDATA%/discor
 
 Se a extração automática falhar, abre o Discord (`Ctrl+Shift+I` > tab **Console**) e experimenta por ordem:
 
-**Método 1 (iframe — recomendado):**
-```js
-const iframe = document.createElement("iframe");
-document.body.appendChild(iframe);
-const token = JSON.parse(iframe.contentWindow.localStorage.token);
-iframe.remove();
-console.log(token);
-```
-
-**Método 2 (fetch interceptor — funciona sempre):**
+**Método 1 (fetch interceptor — funciona sempre):**
 ```js
 (function() {
   const of = globalThis.fetch;
@@ -90,10 +81,19 @@ console.log(token);
     return os.apply(this, [h, v]);
   };
 })();
-// Se não aparecer logo, clica num DM para gerar tráfego
+```
+Depois de colares, **clica num DM** para gerar tráfego — o token aparece na Console.
+
+**Método 2 (iframe — se localStorage existir):**
+```js
+const iframe = document.createElement("iframe");
+document.body.appendChild(iframe);
+const token = JSON.parse(iframe.contentWindow.localStorage.token);
+iframe.remove();
+console.log(token);
 ```
 
-**Método 3 (webpack symbol):**
+**Método 3 (webpack symbol — pode não funcionar em versões recentes):**
 ```js
 window.webpackChunkdiscord_app.push([[Symbol()],{},o=>{for(let e of Object.values(o.c))try{if(!e.exports||e.exports===window)continue;if(e.exports?.getToken)console.log(e.exports.getToken());for(let o in e.exports)e.exports?.[o]?.getToken&&"IntlMessagesProxy"!==e.exports[o][Symbol.toStringTag]&&console.log(e.exports[o].getToken())}catch{}}]),window.webpackChunkdiscord_app.pop();
 ```
