@@ -4,7 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -313,6 +317,48 @@ func runTask(client *DiscordClient, questID string, task TaskInfo, channelID str
 	}
 }
 
+func startDummyGame(exeName, appID string) (*exec.Cmd, string, error) {
+	selfPath, err := os.Executable()
+	if err != nil {
+		return nil, "", fmt.Errorf("os.Executable: %w", err)
+	}
+
+	gameDir := filepath.Join("games", appID)
+	if err := os.MkdirAll(gameDir, 0755); err != nil {
+		return nil, "", fmt.Errorf("mkdir %s: %w", gameDir, err)
+	}
+
+	gameExePath := filepath.Join(gameDir, exeName)
+	data, err := os.ReadFile(selfPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("read %s: %w", selfPath, err)
+	}
+	if err := os.WriteFile(gameExePath, data, 0755); err != nil {
+		return nil, "", fmt.Errorf("write %s: %w", gameExePath, err)
+	}
+
+	cmd := exec.Command(gameExePath, "--dummy-runner")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow: true,
+	}
+	if err := cmd.Start(); err != nil {
+		os.Remove(gameExePath)
+		return nil, "", fmt.Errorf("start %s: %w", gameExePath, err)
+	}
+
+	return cmd, gameExePath, nil
+}
+
+func stopDummyGame(cmd *exec.Cmd, gameExePath string) {
+	if cmd != nil && cmd.Process != nil {
+		cmd.Process.Kill()
+		cmd.Wait()
+	}
+	if gameExePath != "" {
+		os.RemoveAll(filepath.Dir(gameExePath))
+	}
+}
+
 func rnd(a, b int) int {
 	if a >= b {
 		return a
@@ -476,11 +522,8 @@ func runAchievement(client *DiscordClient, questID string, task TaskInfo, channe
 }
 
 func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
-	out("  ▶ PLAY_ON_DESKTOP (%.0f/%.0f s)", task.Done, task.Target)
+	out("  ▶ DESKTOP (%.0f/%.0f s)", task.Done, task.Target)
 
-	cur := task.Done
-	fails := 0
-	pid := rnd(4000, 30000)
 	appID := task.AppID
 
 	var exeName, appName string
@@ -490,113 +533,94 @@ func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 			if name, ok := info["name"].(string); ok {
 				appName = name
 			}
-			if exes, ok := info["executables"].([]any); ok {
-				for _, e := range exes {
-					if em, ok := e.(map[string]any); ok {
-						if os, ok := em["os"].(string); ok && os == "win32" {
-							if name, ok := em["name"].(string); ok {
-								exeName = name
-								break
-							}
-						}
+			exeName = findWin32Exe(info)
+			if exeName != "" {
+				out("  → Jogo: %s | EXE: %s", appName, exeName)
+			} else {
+				out("  → Jogo: %s (ID: %s)", appName, appID)
+			}
+		}
+	}
+
+	if exeName == "" {
+		out("  → A pesquisar na lista de jogos detetáveis...")
+		games, err := client.GetDetectableGames()
+		if err == nil {
+			for _, g := range games {
+				gid, _ := g["id"].(string)
+				if gid == appID {
+					if name, ok := g["name"].(string); ok {
+						appName = name
 					}
+					exeName = findWin32Exe(g)
+					if exeName != "" {
+						out("  → Encontrado na lista: %s | EXE: %s", appName, exeName)
+					}
+					break
 				}
 			}
-			if exeName != "" {
-				out("  → App: %s | EXE: %s", appName, exeName)
-			} else {
-				out("  → App: %s (ID: %s)", appName, appID)
-			}
 		}
 	}
 
-	streamKeys := []string{appID}
-	if exeName != "" {
-		cleanName := strings.ReplaceAll(exeName, ">", "")
-		cleanDir := strings.ToLower(appName)
-		if cleanDir == "" {
-			cleanDir = "game"
-		}
-		exePath := fmt.Sprintf("c:/program files/%s/%s", cleanDir, cleanName)
-		streamKeys = []string{
-			fmt.Sprintf("game:%s:%d", cleanName, pid),
-			fmt.Sprintf("game:%s:%d", exePath, pid),
-			fmt.Sprintf("game:%s:%d", appID, pid),
-			appID,
-		}
-	} else if appID != "" {
-		streamKeys = []string{
-			fmt.Sprintf("game:%s:%d", appID, pid),
-			appID,
-			"ineligible_platform",
-		}
-	} else {
-		streamKeys = []string{"ineligible_platform"}
-	}
-
-	dbg("runDesktop: stream_keys=%v", streamKeys)
-	var streamKey string
-	for _, sk := range streamKeys {
-		prog, term, err := client.SendHeartbeat(questID, sk)
-		if err != nil {
-			if term {
-				dbg("runDesktop: stream_key '%s' -> terminal", sk)
-				continue
-			}
-			dbg("runDesktop: stream_key '%s' -> %v", sk, err)
-			continue
-		}
-		streamKey = sk
-		for _, v := range prog {
-			if v > cur {
-				cur = v
-			}
-		}
-		out("  ✓ stream_key \"%s\" aceite (progresso: %.0f/%.0f)", streamKey, cur, task.Target)
-		break
-	}
-
-	if streamKey == "" {
-		out("  ✗ Nenhuma stream_key funciona para esta quest.")
-		if appID != "" {
-			out("  → Debug: appID=%s exeName=%s", appID, exeName)
-		}
+	if exeName == "" {
+		out("  ✗ Não foi possível determinar o executável do jogo.")
 		out("  → Alternativa 1: Abre Discord (Ctrl+Shift+I) > Console e cola o script de outros-scripts/script-1-funciona.txt")
 		out("  → Alternativa 2: Executa o jogo real com o Discord aberto")
 		return
 	}
 
-	for cur < task.Target {
-		prog, term, err := client.SendHeartbeat(questID, streamKey)
+	cleanName := strings.ReplaceAll(exeName, ">", "")
+
+	cmd, gamePath, err := startDummyGame(cleanName, appID)
+	if err != nil {
+		out("  ✗ Erro ao iniciar processo dummy: %v", err)
+		return
+	}
+	defer stopDummyGame(cmd, gamePath)
+	out("  ✓ Processo dummy: %s", gamePath)
+
+	for {
+		qs, err := client.GetQuests()
 		if err != nil {
-			if term {
-				out("  ✗ %v", err)
-				return
-			}
-			fails++
-			dbg("runDesktop: erro (try %d): %v", fails, err)
-			if fails >= 5 {
-				out("  ✗ Demasiados erros, a abortar")
-				return
-			}
-			time.Sleep(5 * time.Second)
+			dbg("runDesktop: GetQuests error: %v", err)
+			time.Sleep(15 * time.Second)
 			continue
 		}
-		fails = 0
-		for _, v := range prog {
-			if v > cur {
-				cur = v
+
+		var qsUs *UserStatus
+		for _, q := range qs {
+			if q.ID == questID {
+				qsUs = q.UserStatus
+				break
 			}
 		}
-		out("  ✓ %.0f/%.0f (%.0f%%)", cur, task.Target, cur/task.Target*100)
-		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
-		if cur >= task.Target || term {
-			dbg("runDesktop: completo, a enviar terminal heartbeat")
-			client.SendHeartbeat(questID, streamKey)
-			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
-			out("  ✓ PLAY_ON_DESKTOP completo!")
+		if qsUs == nil {
+			out("  ✗ Quest não encontrada na lista")
 			return
 		}
-		time.Sleep(time.Duration(rnd(19000, 22000)) * time.Millisecond)
+
+		cur := float64(0)
+		if task.Key != "" {
+			if pv, ok := qsUs.Progress[task.Key]; ok {
+				cur = pv.Value
+			}
+		}
+		for _, pv := range qsUs.Progress {
+			if pv.Value > cur {
+				cur = pv.Value
+			}
+		}
+
+		out("  ✓ %.0f/%.0f (%.0f%%)", cur, task.Target, cur/task.Target*100)
+		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
+
+		if qsUs.Completed || qsUs.CompletedAt != "" || cur >= task.Target {
+			dbg("runDesktop: quest completa!")
+			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
+			out("  ✓ DESKTOP completo!")
+			return
+		}
+
+		time.Sleep(20 * time.Second)
 	}
 }

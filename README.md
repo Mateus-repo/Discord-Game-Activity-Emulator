@@ -8,12 +8,12 @@ Aplicação **standalone** (`.exe` único) que completa automaticamente **Quests
 
 - ✅ **WATCH_VIDEO** — envia progresso de visualização direto à API
 - ✅ **PLAY_ACTIVITY** — envia heartbeats com `stream_key`
+- ✅ **PLAY_ON_DESKTOP** — corre um processo dummy com o nome do jogo para o Discord detetar
 - ✅ **Auto-enroll** — inscreve-te automaticamente nas quests
 - ✅ **Auto-claim** — reclama a recompensa quando completa
 - ✅ **Extração automática do token** — lê dos ficheiros do Discord
 - ✅ **CLI simples** — corre tudo ou escolhe uma quest específica
-- ⚠️ **PLAY_ON_DESKTOP** — experimental (requer injeção no cliente Discord)
-- ❌ **STREAM_ON_DESKTOP** — não suportado (requer injeção)
+- ❌ **STREAM_ON_DESKTOP** — não suportado (requer injeção no cliente)
 
 ## Como funciona
 
@@ -24,8 +24,8 @@ Aplicação **standalone** (`.exe` único) que completa automaticamente **Quests
    - Detecta o tipo de tarefa (WATCH_VIDEO, PLAY_ACTIVITY, PLAY_ON_DESKTOP, etc.)
    - Executa a estratégia adequada:
      - **WATCH_VIDEO**: `POST /quests/{id}/video-progress` com timestamps crescentes
-     - **PLAY_ACTIVITY**: `POST /quests/{id}/heartbeat` com `call:channelId:random`
-     - **PLAY_ON_DESKTOP**: tenta heartbeats diretos (limitado)
+     - **PLAY_ACTIVITY**: `POST /quests/{id}/heartbeat` com `stream_key` `call:channelId:1`
+     - **PLAY_ON_DESKTOP**: copia o próprio `.exe` para `games/<appID>/<exeName>.exe`, lança-o em background, e o Discord detecta-o como o jogo real a correr — os heartbeats são enviados automaticamente pelo cliente Discord
 4. Quando completa, faz **claim** automático da recompensa
 
 ## Pré-requisitos
@@ -78,8 +78,15 @@ A processar quests...
   ✓ 60/600 (10%)
   ...
   ✓ VIDEO completo!
+  ▶ DESKTOP (0/1800 s)
+  ✓ A correr processo dummy: games/122131413312612/eafc.exe
+  ✓ 15/1800 (1%)
+  ✓ 30/1800 (2%)
+  ...
+  ✓ DESKTOP completo!
   → A reclamar recompensa...
   ✓ Recompensa reclamada!
+  ✓ Processo dummy terminado
 
 Concluído! Verifica o progresso no Discord.
 ```
@@ -89,7 +96,7 @@ Concluído! Verifica o progresso no Discord.
 ```bash
 git clone <repo>
 cd discord-quest-emulator
-go build -o discord-quest-emulator.exe .
+build.bat
 ```
 
 ## ⚠️ Aviso Legal

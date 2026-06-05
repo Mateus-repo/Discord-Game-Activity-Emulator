@@ -4,9 +4,11 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 )
 
 func main() {
+	dummyRunner := flag.Bool("dummy-runner", false, "")
 	cliMode := flag.Bool("cli", false, "modo terminal (sem GUI)")
 	debugPtr := flag.Bool("debug", false, "modo debug com logs detalhados")
 	tokenFlag := flag.String("token", "", "token do Discord (auto se omitido)")
@@ -16,6 +18,11 @@ func main() {
 
 	if *debugPtr {
 		debugMode = true
+	}
+
+	if *dummyRunner {
+		runDummyRunner()
+		return
 	}
 
 	if *cliMode || *questID != "" || *tokenFlag != "" {
@@ -170,4 +177,10 @@ func join(parts []string, sep string) string {
 		s += sep + p
 	}
 	return s
+}
+
+func runDummyRunner() {
+	for {
+		time.Sleep(24 * time.Hour)
+	}
 }

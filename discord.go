@@ -373,6 +373,40 @@ func (c *DiscordClient) FindVoiceChannel() string {
 	return ""
 }
 
+func (c *DiscordClient) GetDetectableGames() ([]map[string]any, error) {
+	dbg("GetDetectableGames: GET /applications/detectable")
+	resp, err := c.do("GET", "/applications/detectable", nil)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("erro %d: %s", resp.StatusCode, string(b))
+	}
+	var games []map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&games); err != nil {
+		return nil, err
+	}
+	dbg("GetDetectableGames: %d jogos reconhecidos", len(games))
+	return games, nil
+}
+
+func findWin32Exe(info map[string]any) string {
+	if exes, ok := info["executables"].([]any); ok {
+		for _, e := range exes {
+			if em, ok := e.(map[string]any); ok {
+				if os, ok := em["os"].(string); ok && os == "win32" {
+					if name, ok := em["name"].(string); ok {
+						return name
+					}
+				}
+			}
+		}
+	}
+	return ""
+}
+
 func (c *DiscordClient) GetAppInfo(appID string) (map[string]any, error) {
 	dbg("GetAppInfo: app_id=%s", appID)
 	resp, err := c.do("GET", "/applications/public?application_ids="+appID, nil)
