@@ -64,18 +64,20 @@ O token é **auto-extraído** dos ficheiros locais do Discord (`%APPDATA%/discor
 
 Se a extração automática falhar:
 
-1. Abre o Discord, carrega `Ctrl+Shift+I`, vai à tab **Console**
-2. Cola um dos comandos abaixo:
+**Método 1 (recomendado):**
+1. Abre o Discord, `Ctrl+Shift+I`
+2. Vai à tab **Application > Local Storage > discord.com**
+3. Copia o valor da chave `"token"`
 
-```js
-// Método 1 (webpack)
-(webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())
+**Método 2 (Console):**
+1. `Ctrl+Shift+I` > tab **Console**
+2. Cola: `localStorage.getItem("token")`
+3. Se falhar, tenta o método webpack:
+   ```js
+   (webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())
+   ```
 
-// Método 2 (alternativo)
-(function(){const w=webpackChunkdiscord_app.push([[],{},r=>r]);delete w.default;const m=Object.values(w.c).find(m=>m?.exports?.default?.getToken);return m?.exports?.default?.getToken()})()
-```
-
-3. Guarda o resultado em `token.json`: `{"token": "o-teu-token"}` ou usa `--token <token>`
+Guarda o resultado em `token.json`: `{"token": "o-teu-token"}` ou usa `--token <token>`
 
 ## Exemplo de output
 

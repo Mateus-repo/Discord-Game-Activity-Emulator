@@ -216,17 +216,16 @@ func runDummyRunner() {
 func manualInstructions() {
 	fmt.Println(`Para obter o token manualmente:`)
 	fmt.Println()
-	fmt.Println(`Método 1 — Abre o Discord, carrega Ctrl+Shift+I, vai à tab Console e cola:`)
+	fmt.Println(`Método 1 (recomendado) — Abre o Discord, Ctrl+Shift+I, vai à tab Application > Local Storage > discord.com`)
+	fmt.Println(`  e copia o valor da chave "token"`)
+	fmt.Println()
+	fmt.Println(`Método 2 — Na tab Console, experimenta um destes:`)
 	fmt.Println(`  (webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())`)
-	fmt.Println()
-	fmt.Println(`Se der "undefined", tenta este:`)
-	fmt.Println(`  (function(){const w=webpackChunkdiscord_app.push([[],{},r=>r]);delete w.default;const m=Object.values(w.c).find(m=>m?.exports?.default?.getToken);return m?.exports?.default?.getToken()})()`)
-	fmt.Println()
-	fmt.Println(`Método 2 — Abre o Discord, carrega Ctrl+Shift+I, vai à tab Application > Local Storage > discord.com e copia o valor de "token"`)
+	fmt.Println(`  localStorage.getItem("token")`)
 	fmt.Println()
 	fmt.Println(`Depois de obteres o token, guarda-o em token.json ou usa --token <token>`)
 	fmt.Println()
-	fmt.Println(`Dica: Se o Discord estiver aberto e funcionar, muitas vezes basta fechar e abrir o programa que ele encontra automaticamente.`)
+	fmt.Println(`Dica: Se o Discord estiver aberto, o programa encontra o token automaticamente.`)
 }
 
 func stopDesktopHeartbeat(questID, appID, exePath string) {

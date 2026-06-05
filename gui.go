@@ -182,15 +182,12 @@ func (g *gui) auth() (*DiscordClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf(`token não encontrado.
 
-1. Abre o Discord, Ctrl+Shift+I, tab Console
-2. Cola um destes comandos:
+1. Abre o Discord, Ctrl+Shift+I
+2. Vai a Application > Local Storage > discord.com e copia o valor de "token"
+3. Guarda em token.json: {"token": "o-teu-token"} e reabre o programa
 
-   (webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())
-
-   Se der undefined, tenta:
-   (function(){const w=webpackChunkdiscord_app.push([[],{},r=>r]);delete w.default;const m=Object.values(w.c).find(m=>m?.exports?.default?.getToken);return m?.exports?.default?.getToken()})()
-
-3. Guarda o resultado em token.json e reabre o programa`)
+Se não encontrares, experimenta na tab Console:
+  localStorage.getItem("token")`)
 	}
 	client := NewDiscordClient(token)
 	if err := client.Verify(); err != nil {
