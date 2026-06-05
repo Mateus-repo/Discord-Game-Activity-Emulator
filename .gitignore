@@ -1,0 +1,17 @@
+# Go installation (portable)
+.go/
+
+# Build output
+discord-quest-emulator.exe
+discord-quest-emulator
+*.exe
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temp
+*.log
+tmp/

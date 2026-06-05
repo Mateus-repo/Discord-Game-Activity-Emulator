@@ -1,50 +1,59 @@
-# TODO - Discord Game Activity Emulator
+# TODO - Discord Quest Emulator
 
 ## Fase 1: Estrutura do Projeto ✅
 - [x] Criar repositório e README inicial
-- [ ] Escolher linguagem (Go: standalone binary, bom suporte HTTP/filesystem)
+- [x] Escolher linguagem (Go: standalone binary, bom suporte HTTP/filesystem)
 - [x] Configurar go.mod
-- [ ] Criar estrutura de diretórios
+- [x] Criar .gitignore
+- [x] Criar README.md completo
+- [x] Criar TODO.md
 
-## Fase 2: Extração de Token
-- [ ] Estudar onde o Discord armazena o token (Local Storage / leveldb)
-- [ ] Implementar leitura do token no Windows (`%APPDATA%/discord/Local Storage/leveldb/`)
-- [ ] Implementar parser dos ficheiros leveldb para extrair token
-- [ ] Suporte a fallback (usuário pode fornecer token manualmente)
-- [ ] Validar token (testar com um GET /users/@me)
+## Fase 2: Extração de Token ✅
+- [x] Estudar onde o Discord armazena o token (Local Storage / leveldb)
+- [x] Implementar leitura do token no Windows (`%APPDATA%/discord/Local Storage/leveldb/`)
+- [x] Implementar parser dos ficheiros leveldb para extrair token
+- [x] Suporte a fallback (usuário pode fornecer token manualmente com `--token`)
+- [x] Validar token (testar com GET /users/@me)
 
-## Fase 3: API Client do Discord
-- [ ] Implementar cliente HTTP com headers de autenticação
-- [ ] `GET /users/@me/quests` — listar quests
-- [ ] `POST /quests/{id}/video-progress` — progresso de vídeo
-- [ ] `POST /quests/{id}/heartbeat` — heartbeat para atividades
-- [ ] `GET /applications/public` — obter info de aplicações das quests
-- [ ] Rate limiting / retry handling
+## Fase 3: API Client do Discord ✅
+- [x] Implementar cliente HTTP com headers de autenticação
+- [x] Rate limiting (retry em 429)
+- [x] `GET /users/@me` — verificar token
+- [x] `GET /users/@me/quests` — listar quests
+- [x] `POST /quests/{id}/enroll` — inscrever em quest
+- [x] `POST /quests/{id}/video-progress` — progresso de vídeo
+- [x] `POST /quests/{id}/heartbeat` — heartbeat para atividades
+- [x] `POST /quests/{id}/claim-reward` — reclamar recompensa
+- [x] `GET /applications/public` — obter info de aplicações
 
-## Fase 4: Lógica de Quests
-- [ ] Modelar tipos de quest (WATCH_VIDEO, PLAY_ACTIVITY, PLAY_ON_DESKTOP, etc.)
-- [ ] Implementar `QuestRunner` interface
-- [ ] **WATCH_VIDEO**: enviar timestamps sequenciais até completar
-- [ ] **PLAY_ACTIVITY**: gerar stream_key e enviar heartbeats
-- [ ] **PLAY_ON_DESKTOP**: pesquisar endpoint correto para heartbeats de jogo
-- [ ] **STREAM_ON_DESKTOP**: simular estado de streaming
-- [ ] Progress tracking e deteção de conclusão
+## Fase 4: Lógica de Quests ✅
+- [x] Modelar tipos de quest (WATCH_VIDEO, PLAY_ACTIVITY, PLAY_ON_DESKTOP, ACHIEVEMENT, STREAM)
+- [x] Deteção de tarefas a partir do config da quest (task_config / task_config_v2)
+- [x] **WATCH_VIDEO**: enviar timsteps com delay de 1.2-1.8s entre calls
+- [x] **PLAY_ACTIVITY**: heartbeats com `call:channelId:random` a cada 19-22s
+- [x] **ACHIEVEMENT_IN_ACTIVITY**: heartbeats com fallback a modo manual
+- [x] **PLAY_ON_DESKTOP**: tentativa de heartbeats diretos (limitado)
+- [x] **STREAM_ON_DESKTOP**: marcado como não suportado
+- [x] Auto-enroll antes de processar
+- [x] Auto-claim após completar
+- [ ] Melhorar PLAY_ON_DESKTOP com injeção de processo falso
 
-## Fase 5: Interface do Utilizador
-- [ ] Implementar CLI básica (flags: list, run, --quest-id)
-- [ ] Mostrar Quests disponíveis com formatação legível
-- [ ] Mostrar progresso em tempo real
-- [ ] Opção interativa (selecionar quests com setas)
+## Fase 5: Interface do Utilizador ✅
+- [x] CLI básica com flags (--id, --token)
+- [x] Listar quests com nomes, tipos, progresso
+- [x] Mostrar progresso em tempo real durante execução
+- [ ] Opção interativa (selecionar quests)
+- [ ] Cor e formatação melhorada
 
 ## Fase 6: Build e Distribuição
 - [ ] Script de build para Windows (build.bat)
+- [x] Testar compilação (go vet ok, build ok)
 - [ ] Testar em ambiente real
 - [ ] Documentar limitações conhecidas
 - [ ] Criar release no GitHub
 
 ## Ideias Futuras
-- [ ] Suporte a Linux/macOS
-- [ ] GUI com Tauri/Python
-- [ ] Injeção de DLL para suporte total a PLAY_ON_DESKTOP
+- [ ] Suporte a Linux/macOS (ler token de locais diferentes)
+- [ ] Injeção de DLL ou processo falso para PLAY_ON_DESKTOP
 - [ ] Serviço em background (system tray)
-- [ ] Notificações quando quest completar
+- [ ] TUI interativa com bubbletea
