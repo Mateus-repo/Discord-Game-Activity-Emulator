@@ -40,6 +40,7 @@ func main() {
 			fmt.Println("✗ Token inválido:", err)
 			os.Exit(1)
 		}
+		saveToken(token, client.user)
 		fmt.Println("✓ Token válido —", client.user)
 		fmt.Println("Token:", token[:30]+"...")
 		return
@@ -87,6 +88,7 @@ func runCLI(tokenArg, questID, channelID string) {
 		os.Exit(1)
 	}
 	fmt.Println("✓ Autenticado como", client.user)
+	saveToken(token, client.user)
 
 	quests, err := client.GetQuests()
 	if err != nil {
@@ -222,7 +224,7 @@ func manualInstructions() {
 	fmt.Println()
 	fmt.Println(`Método 2 — Abre o Discord, carrega Ctrl+Shift+I, vai à tab Application > Local Storage > discord.com e copia o valor de "token"`)
 	fmt.Println()
-	fmt.Println(`Depois de obteres o token, guarda-o em token.txt ou usa --token <token>`)
+	fmt.Println(`Depois de obteres o token, guarda-o em token.json ou usa --token <token>`)
 	fmt.Println()
 	fmt.Println(`Dica: Se o Discord estiver aberto e funcionar, muitas vezes basta fechar e abrir o programa que ele encontra automaticamente.`)
 }
@@ -239,6 +241,7 @@ func stopDesktopHeartbeat(questID, appID, exePath string) {
 		os.Exit(1)
 	}
 	fmt.Println("✓ Autenticado como", client.user)
+	saveToken(token, client.user)
 	fmt.Println("  → A enviar terminal heartbeat...")
 	_, _, err = client.SendDesktopHeartbeat(questID, appID, exePath, true)
 	if err != nil {

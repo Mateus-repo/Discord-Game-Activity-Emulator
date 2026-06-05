@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,11 +14,20 @@ var (
 	mfaTokenRegex = regexp.MustCompile(`mfa\.[a-zA-Z0-9_-]{84,}`)
 )
 
-const tokenFile = "token.txt"
+const tokenFile = "token.json"
+
+type storedToken struct {
+	Token   string `json:"token"`
+	Account string `json:"account,omitempty"`
+}
 
 func findDiscordToken() (string, error) {
-	if tok := readTokenFile(tokenFile); tok != "" {
+	if tok, _ := readTokenJSON(tokenFile); tok != "" {
 		dbg("token lido de %s", tokenFile)
+		return tok, nil
+	}
+	if tok := readTokenFile("token.txt"); tok != "" {
+		dbg("token migrado de token.txt para %s", tokenFile)
 		return tok, nil
 	}
 
@@ -34,7 +44,6 @@ func findDiscordToken() (string, error) {
 		tok, err := scanDir(dir)
 		if err == nil && tok != "" {
 			dbg("token encontrado em %s", dir)
-			saveToken(tok)
 			return tok, nil
 		}
 		dbg("token não encontrado em %s: %v", dir, err)
@@ -58,11 +67,36 @@ func readTokenFile(path string) string {
 	return s
 }
 
-func saveToken(tok string) {
-	if readTokenFile(tokenFile) != "" {
+func readTokenJSON(path string) (string, string) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", ""
+	}
+	var st storedToken
+	if err := json.Unmarshal(data, &st); err != nil {
+		return "", ""
+	}
+	if st.Token == "" {
+		return "", ""
+	}
+	return st.Token, st.Account
+}
+
+func saveToken(tok, account string) {
+	if tok == "" {
 		return
 	}
-	if err := os.WriteFile(tokenFile, []byte(tok+"\n"), 0644); err != nil {
+	existingTok, existingAccount := readTokenJSON(tokenFile)
+	if existingTok == tok && existingAccount == account {
+		return
+	}
+	st := storedToken{Token: tok, Account: account}
+	data, err := json.MarshalIndent(st, "", "  ")
+	if err != nil {
+		dbg("saveToken: json.Marshal: %v", err)
+		return
+	}
+	if err := os.WriteFile(tokenFile, data, 0644); err != nil {
 		dbg("saveToken: erro ao guardar: %v", err)
 		return
 	}

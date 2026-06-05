@@ -17,7 +17,7 @@ discord-quest-emulator
 tmp/
 
 # Token file
-token.txt
+token.json
 discord.com.har
 Copy
 Sair

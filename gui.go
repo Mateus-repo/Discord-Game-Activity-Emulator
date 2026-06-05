@@ -190,7 +190,7 @@ func (g *gui) auth() (*DiscordClient, error) {
    Se der undefined, tenta:
    (function(){const w=webpackChunkdiscord_app.push([[],{},r=>r]);delete w.default;const m=Object.values(w.c).find(m=>m?.exports?.default?.getToken);return m?.exports?.default?.getToken()})()
 
-3. Guarda o resultado em token.txt e reabre o programa`)
+3. Guarda o resultado em token.json e reabre o programa`)
 	}
 	client := NewDiscordClient(token)
 	if err := client.Verify(); err != nil {
