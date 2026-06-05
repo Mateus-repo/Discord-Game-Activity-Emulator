@@ -477,28 +477,66 @@ func runAchievement(client *DiscordClient, questID string, task TaskInfo, channe
 
 func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 	out("  ▶ PLAY_ON_DESKTOP (%.0f/%.0f s)", task.Done, task.Target)
-	out("  → A tentar heartbeats com stream_key")
 
-	streamKey := "ineligible_platform"
 	cur := task.Done
 	fails := 0
-	dbg("runDesktop: stream_key=%s", streamKey)
+	pid := rnd(4000, 30000)
+	appID := task.AppID
 
-	for i := 0; i < 10; i++ {
+	streamKeys := []string{
+		"ineligible_platform",
+	}
+	if appID != "" {
+		streamKeys = []string{
+			fmt.Sprintf("game:%s:%d", appID, pid),
+			fmt.Sprintf("desktop:%s:%d", appID, pid),
+			appID,
+		}
+	}
+	dbg("runDesktop: stream_keys=%v", streamKeys)
+
+	var streamKey string
+	for _, sk := range streamKeys {
+		prog, term, err := client.SendHeartbeat(questID, sk)
+		if err != nil {
+			if term {
+				dbg("runDesktop: stream_key %s -> terminal error", sk)
+				continue
+			}
+			dbg("runDesktop: stream_key %s -> %v", sk, err)
+			continue
+		}
+		streamKey = sk
+		for _, v := range prog {
+			if v > cur {
+				cur = v
+			}
+		}
+		out("  ✓ stream_key \"%s\" aceite (progresso: %.0f/%.0f)", streamKey, cur, task.Target)
+		break
+	}
+
+	if streamKey == "" {
+		out("  ✗ Nenhuma stream_key funciona para esta quest.")
+		out("  → Alternativa: Abre o Discord (Ctrl+Shift+I) > Console e usa o script em outros-scripts/script-1-funciona.txt")
+		out("    Ou executa o jogo real para completar a quest.")
+		return
+	}
+
+	for cur < task.Target {
 		prog, term, err := client.SendHeartbeat(questID, streamKey)
 		if err != nil {
 			if term {
-				out("  ✗ PLAY_ON_DESKTOP não suporta heartbeats diretos.")
-				out("  → Alternativa: Executa o jogo real ou usa injeção no cliente Discord.")
+				out("  ✗ %v", err)
 				return
 			}
 			fails++
 			dbg("runDesktop: erro (try %d): %v", fails, err)
-			if fails >= 3 {
-				out("  ✗ PLAY_ON_DESKTOP requer injeção no cliente Discord")
+			if fails >= 5 {
+				out("  ✗ Demasiados erros, a abortar")
 				return
 			}
-			time.Sleep(3 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 		fails = 0
@@ -507,14 +545,15 @@ func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 				cur = v
 			}
 		}
-		out("  ✓ %.0f/%.0f", cur, task.Target)
+		out("  ✓ %.0f/%.0f (%.0f%%)", cur, task.Target, cur/task.Target*100)
 		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
 		if cur >= task.Target || term {
+			dbg("runDesktop: completo, a enviar terminal heartbeat")
+			client.SendHeartbeat(questID, streamKey)
 			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
 			out("  ✓ PLAY_ON_DESKTOP completo!")
 			return
 		}
 		time.Sleep(time.Duration(rnd(19000, 22000)) * time.Millisecond)
 	}
-	out("  → PLAY_ON_DESKTOP requer injeção no cliente Discord para funcionar")
 }
