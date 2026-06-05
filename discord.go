@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -303,6 +305,93 @@ func (c *DiscordClient) SendHeartbeat(questID, streamKey string) (map[string]flo
 	}
 	dbg("SendHeartbeat: progress=%v completed=%v", out, hr.CompletedAt != "")
 	return out, hr.CompletedAt != "", nil
+}
+
+func newSessionID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func (c *DiscordClient) SendDesktopHeartbeat(questID, appID, exePath string, terminal bool) (map[string]float64, bool, error) {
+	body := map[string]any{
+		"terminal": terminal,
+	}
+	if !terminal {
+		body["application_id"] = appID
+		body["executable_path"] = exePath
+	}
+	dbg("SendDesktopHeartbeat: quest=%s terminal=%v body=%v", questID, terminal, body)
+	resp, err := c.do("POST", "/quests/"+questID+"/heartbeat", body)
+	if err != nil {
+		return nil, false, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 400 {
+		return nil, true, fmt.Errorf("quest inválida ou expirada")
+	}
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, false, fmt.Errorf("erro %d: %s", resp.StatusCode, string(b))
+	}
+	var hr struct {
+		Progress    map[string]ProgressValue `json:"progress"`
+		CompletedAt string                   `json:"completed_at,omitempty"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&hr); err != nil {
+		return nil, false, fmt.Errorf("json.Decode: %w", err)
+	}
+	out := make(map[string]float64)
+	for k, v := range hr.Progress {
+		out[k] = v.Value
+	}
+	dbg("SendDesktopHeartbeat: progress=%v completed=%v", out, hr.CompletedAt != "")
+	return out, hr.CompletedAt != "", nil
+}
+
+func (c *DiscordClient) CallActivity(appID, exePath, sessionID, token string, duration int, closed bool) (string, error) {
+	var tok *string
+	if token != "" {
+		tok = &token
+	}
+	body := map[string]any{
+		"application_id":   appID,
+		"token":            tok,
+		"duration":         duration,
+		"share_activity":   true,
+		"closed":           closed,
+		"exePath":          exePath,
+		"voice_channel_id": nil,
+		"session_id":       sessionID,
+		"media_session_id": nil,
+	}
+	dbg("CallActivity: app=%s closed=%v", appID, closed)
+	resp, err := c.do("POST", "/activities", body)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		b, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("activity erro %d: %s", resp.StatusCode, string(b))
+	}
+	var ar struct {
+		Token string `json:"token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ar); err != nil {
+		return "", fmt.Errorf("json.Decode: %w", err)
+	}
+	dbg("CallActivity: token=%s", ar.Token[:min(len(ar.Token), 20)])
+	return ar.Token, nil
+}
+
+func (c *DiscordClient) StartActivity(appID, exePath, sessionID string) (string, error) {
+	return c.CallActivity(appID, exePath, sessionID, "", 0, false)
+}
+
+func (c *DiscordClient) StopActivity(appID, exePath, sessionID, token string, duration int) error {
+	_, err := c.CallActivity(appID, exePath, sessionID, token, duration, true)
+	return err
 }
 
 type Guild struct {

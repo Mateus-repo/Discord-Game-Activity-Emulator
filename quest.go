@@ -564,63 +564,75 @@ func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 
 	if exeName == "" {
 		out("  ✗ Não foi possível determinar o executável do jogo.")
-		out("  → Alternativa 1: Abre Discord (Ctrl+Shift+I) > Console e cola o script de outros-scripts/script-1-funciona.txt")
-		out("  → Alternativa 2: Executa o jogo real com o Discord aberto")
-		return
+		out("  → Usando exeName padrão 'game.exe'")
+		exeName = "game.exe"
+		if appName == "" {
+			appName = "Game"
+		}
 	}
 
-	cleanName := strings.ReplaceAll(exeName, ">", "")
+	exePath := strings.ToLower(strings.ReplaceAll(appName, ":", "")) + "/" + exeName
+	exePath = strings.ReplaceAll(exePath, " ", " ")
+	out("  → ExePath: %s", exePath)
 
-	cmd, gamePath, err := startDummyGame(cleanName, appID)
+	sessionID := newSessionID()
+	token, err := client.StartActivity(appID, exePath, sessionID)
 	if err != nil {
-		out("  ✗ Erro ao iniciar processo dummy: %v", err)
-		return
+		dbg("runDesktop: StartActivity falhou (não fatal): %v", err)
+	} else {
+		out("  ✓ Sessão de atividade iniciada")
 	}
-	defer stopDummyGame(cmd, gamePath)
-	out("  ✓ Processo dummy: %s", gamePath)
 
-	for {
-		qs, err := client.GetQuests()
+	cur := task.Done
+	fails := 0
+	startTime := time.Now()
+
+	for cur < task.Target {
+		prog, term, err := client.SendDesktopHeartbeat(questID, appID, exePath, false)
 		if err != nil {
-			dbg("runDesktop: GetQuests error: %v", err)
-			time.Sleep(15 * time.Second)
+			if term {
+				out("  ✗ %v", err)
+				return
+			}
+			fails++
+			dbg("runDesktop: heartbeat erro (try %d): %v", fails, err)
+			if fails >= 5 {
+				out("  ✗ Demasiados erros, a abortar")
+				return
+			}
+			time.Sleep(5 * time.Second)
 			continue
 		}
+		fails = 0
 
-		var qsUs *UserStatus
-		for _, q := range qs {
-			if q.ID == questID {
-				qsUs = q.UserStatus
-				break
+		hasProg := false
+		for _, v := range prog {
+			if v > cur {
+				cur = v
 			}
+			hasProg = true
 		}
-		if qsUs == nil {
-			out("  ✗ Quest não encontrada na lista")
-			return
-		}
-
-		cur := float64(0)
-		if task.Key != "" {
-			if pv, ok := qsUs.Progress[task.Key]; ok {
-				cur = pv.Value
-			}
-		}
-		for _, pv := range qsUs.Progress {
-			if pv.Value > cur {
-				cur = pv.Value
-			}
+		if !hasProg {
+			elapsed := time.Since(startTime).Seconds()
+			cur = task.Done + elapsed
+			dbg("runDesktop: progress map vazio, a estimar %.0f", cur)
 		}
 
 		out("  ✓ %.0f/%.0f (%.0f%%)", cur, task.Target, cur/task.Target*100)
 		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
 
-		if qsUs.Completed || qsUs.CompletedAt != "" || cur >= task.Target {
-			dbg("runDesktop: quest completa!")
+		if cur >= task.Target || term {
+			dbg("runDesktop: completo, a enviar terminal heartbeat")
+			client.SendDesktopHeartbeat(questID, appID, exePath, true)
+			if token != "" {
+				duration := int(time.Since(startTime).Seconds())
+				client.StopActivity(appID, exePath, sessionID, token, duration)
+			}
 			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
 			out("  ✓ DESKTOP completo!")
 			return
 		}
 
-		time.Sleep(20 * time.Second)
+		time.Sleep(time.Duration(rnd(19000, 22000)) * time.Millisecond)
 	}
 }

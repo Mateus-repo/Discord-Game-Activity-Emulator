@@ -36,7 +36,9 @@
 - [x] **STREAM_ON_DESKTOP**: marcado como não suportado
 - [x] Auto-enroll antes de processar
 - [x] Auto-claim após completar
-- [ ] Melhorar PLAY_ON_DESKTOP com injeção de processo falso
+- [x] PLAY_ON_DESKTOP: implementar heartbeats diretos via API (body: application_id + executable_path + terminal)
+- [x] PLAY_ON_DESKTOP: adicionar POST /api/v9/activities para iniciar/parar sessão
+- [x] PLAY_ON_DESKTOP: substituir dummy process por heartbeats diretos a cada 20s
 
 ## Fase 5: Interface do Utilizador ✅
 - [x] CLI básica com flags (--id, --token)
