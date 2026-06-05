@@ -168,13 +168,9 @@ type TaskDef struct {
 	Target int `json:"target"`
 }
 
-type QuestListResp struct {
-	Quests []Quest `json:"quests"`
-}
-
 func (c *DiscordClient) GetQuests() ([]Quest, error) {
-	dbg("GetQuests: GET /users/@me/quests")
-	resp, err := c.do("GET", "/users/@me/quests", nil)
+	dbg("GetQuests: GET /quests/@me")
+	resp, err := c.do("GET", "/quests/@me", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +179,9 @@ func (c *DiscordClient) GetQuests() ([]Quest, error) {
 		b, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("erro %d: %s", resp.StatusCode, string(b))
 	}
-	var ql QuestListResp
+	var ql struct {
+		Quests []Quest `json:"quests"`
+	}
 	if err := json.NewDecoder(resp.Body).Decode(&ql); err != nil {
 		return nil, fmt.Errorf("json.Decode: %w", err)
 	}
