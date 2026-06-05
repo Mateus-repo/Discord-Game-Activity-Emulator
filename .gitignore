@@ -15,3 +15,6 @@ discord-quest-emulator
 # Temp
 *.log
 tmp/
+
+# Token file
+token.txt

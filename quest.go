@@ -206,11 +206,7 @@ func isExpired(q Quest) bool {
 		dbg("isExpired: parse error %s: %v", q.Config.ExpiresAt, err)
 		return false
 	}
-	exp := time.Now().After(t)
-	if exp {
-		dbg("isExpired: quest expirada em %s", q.Config.ExpiresAt)
-	}
-	return exp
+	return time.Now().After(t)
 }
 
 func runQuests(client *DiscordClient, quests []Quest, channelID string) {
@@ -221,14 +217,14 @@ func runQuests(client *DiscordClient, quests []Quest, channelID string) {
 			continue
 		}
 		if isExpired(q) {
-			fmt.Printf("[!] \"%s\" — expirada\n", questName(q))
+			out("[!] \"%s\" — expirada", questName(q))
 			continue
 		}
 		if us.CompletedAt != "" || us.Completed {
 			if us.ClaimedAt != "" {
-				fmt.Printf("[✓] \"%s\" — já reclamada\n", questName(q))
+				out("[✓] \"%s\" — já reclamada", questName(q))
 			} else {
-				fmt.Printf("[✓] \"%s\" — COMPLETA! A reclamar...\n", questName(q))
+				out("[✓] \"%s\" — COMPLETA! A reclamar...", questName(q))
 				claimQuest(client, q)
 			}
 			continue
@@ -236,26 +232,30 @@ func runQuests(client *DiscordClient, quests []Quest, channelID string) {
 
 		tasks := identifyTasks(q)
 		if len(tasks) == 0 {
-			fmt.Printf("[?] \"%s\" — sem tarefas reconhecidas\n", questName(q))
+			out("[?] \"%s\" — sem tarefas reconhecidas", questName(q))
 			continue
 		}
 
-		fmt.Printf("\n▶ \"%s\"\n", questName(q))
+		qn := questName(q)
+		out("")
+		out("▶ \"%s\"", qn)
 
 		if us.EnrolledAt == "" {
-			fmt.Printf("  → A inscrever na quest...\n")
+			out("  → A inscrever na quest...")
 			if err := client.Enroll(q.ID); err != nil {
-				fmt.Printf("  ✗ Erro ao inscrever: %v\n", err)
+				out("  ✗ Erro ao inscrever: %v", err)
 				continue
 			}
-			fmt.Printf("  ✓ Inscrito!\n")
+			out("  ✓ Inscrito!")
 		}
 
 		for _, t := range tasks {
 			if t.Done >= t.Target {
-				fmt.Printf("  ✓ %s: já completo (%.0f/%.0f)\n", t.Type, t.Done, t.Target)
+				out("  ✓ %s: já completo (%.0f/%.0f)", t.Type, t.Done, t.Target)
+				sendProgress(q.ID, qn, string(t.Type), t.Done, t.Target, "done")
 				continue
 			}
+			sendProgress(q.ID, qn, string(t.Type), t.Done, t.Target, "running")
 			runTask(client, q.ID, t, channelID)
 		}
 
@@ -283,16 +283,16 @@ func isCompleted(client *DiscordClient, questID string) bool {
 }
 
 func claimQuest(client *DiscordClient, q Quest) {
-	fmt.Printf("  → A reclamar recompensa...\n")
+	out("  → A reclamar recompensa...")
 	if err := client.ClaimReward(q.ID); err != nil {
 		if strings.Contains(err.Error(), "captcha") || strings.Contains(err.Error(), "confirmado") {
-			fmt.Printf("  ⚠ Captcha necessário! Faz claim manualmente no Discord.\n")
+			out("  ⚠ Captcha necessário! Faz claim manualmente no Discord.")
 		} else {
-			fmt.Printf("  ✗ Erro ao reclamar: %v\n", err)
+			out("  ✗ Erro ao reclamar: %v", err)
 		}
 		return
 	}
-	fmt.Printf("  ✓ Recompensa reclamada!\n")
+	out("  ✓ Recompensa reclamada!")
 }
 
 func runTask(client *DiscordClient, questID string, task TaskInfo, channelID string) {
@@ -307,9 +307,9 @@ func runTask(client *DiscordClient, questID string, task TaskInfo, channelID str
 	case PlayOnDesktop:
 		runDesktop(client, questID, task)
 	case StreamDesktop:
-		fmt.Printf("  [?] %s: requer injeção no cliente Discord (modo desktop)\n", task.Type)
+		out("  [?] %s: requer injeção no cliente Discord (modo desktop)", task.Type)
 	default:
-		fmt.Printf("  [?] %s: tipo não implementado\n", task.Type)
+		out("  [?] %s: tipo não implementado", task.Type)
 	}
 }
 
@@ -321,7 +321,7 @@ func rnd(a, b int) int {
 }
 
 func runVideo(client *DiscordClient, questID string, task TaskInfo) {
-	fmt.Printf("  ▶ VIDEO (%.0f/%.0f s)\n", task.Done, task.Target)
+	out("  ▶ VIDEO (%.0f/%.0f s)", task.Done, task.Target)
 	cur := task.Done
 	step := 30.0
 	fails := 0
@@ -335,13 +335,13 @@ func runVideo(client *DiscordClient, questID string, task TaskInfo) {
 		prog, term, err := client.SendVideoProgress(questID, sendVal, progressKey)
 		if err != nil {
 			if term {
-				fmt.Printf("  ✗ %v\n", err)
+				out("  ✗ %v", err)
 				return
 			}
 			fails++
 			dbg("runVideo: erro (try %d): %v", fails, err)
 			if fails >= 5 {
-				fmt.Printf("  ✗ Demasiados erros, a abortar\n")
+				out("  ✗ Demasiados erros, a abortar")
 				return
 			}
 			time.Sleep(5 * time.Second)
@@ -351,10 +351,11 @@ func runVideo(client *DiscordClient, questID string, task TaskInfo) {
 		if prog > cur {
 			cur = prog
 		}
-		pct := cur / task.Target * 100
-		fmt.Printf("  ✓ %.0f/%.0f (%.0f%%)\n", cur, task.Target, pct)
+		out("  ✓ %.0f/%.0f (%.0f%%)", cur, task.Target, cur/task.Target*100)
+		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
 		if cur >= task.Target || term {
-			fmt.Printf("  ✓ VIDEO completo!\n")
+			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
+			out("  ✓ VIDEO completo!")
 			return
 		}
 		time.Sleep(time.Duration(rnd(1200, 1800)) * time.Millisecond)
@@ -362,9 +363,9 @@ func runVideo(client *DiscordClient, questID string, task TaskInfo) {
 }
 
 func runActivity(client *DiscordClient, questID string, task TaskInfo, channelID string) {
-	fmt.Printf("  ▶ ACTIVITY (%.0f/%.0f s)\n", task.Done, task.Target)
+	out("  ▶ ACTIVITY (%.0f/%.0f s)", task.Done, task.Target)
 	if channelID == "" || channelID == "0" {
-		fmt.Printf("  → Sem voice channel. Usa --channel <id> ou entra num voice channel.\n")
+		out("  → Sem voice channel. Usa --channel <id> ou entra num voice channel.")
 	}
 	ch := channelID
 	if ch == "" {
@@ -379,13 +380,13 @@ func runActivity(client *DiscordClient, questID string, task TaskInfo, channelID
 		prog, term, err := client.SendHeartbeat(questID, streamKey)
 		if err != nil {
 			if term {
-				fmt.Printf("  ✗ %v\n", err)
+				out("  ✗ %v", err)
 				return
 			}
 			fails++
 			dbg("runActivity: erro (try %d): %v", fails, err)
 			if fails >= 5 {
-				fmt.Printf("  ✗ Demasiados erros\n")
+				out("  ✗ Demasiados erros")
 				return
 			}
 			time.Sleep(5 * time.Second)
@@ -404,12 +405,13 @@ func runActivity(client *DiscordClient, questID string, task TaskInfo, channelID
 			cur += 20
 			dbg("runActivity: progress map vazio, a incrementar +20")
 		}
-		pct := cur / task.Target * 100
-		fmt.Printf("  ✓ %.0f/%.0f (%.0f%%)\n", cur, task.Target, pct)
+		out("  ✓ %.0f/%.0f (%.0f%%)", cur, task.Target, cur/task.Target*100)
+		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
 		if cur >= task.Target || term {
 			dbg("runActivity: completo, a enviar terminal heartbeat")
 			client.SendHeartbeat(questID, streamKey)
-			fmt.Printf("  ✓ ACTIVITY completo!\n")
+			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
+			out("  ✓ ACTIVITY completo!")
 			return
 		}
 		time.Sleep(time.Duration(rnd(19000, 22000)) * time.Millisecond)
@@ -417,9 +419,9 @@ func runActivity(client *DiscordClient, questID string, task TaskInfo, channelID
 }
 
 func runAchievement(client *DiscordClient, questID string, task TaskInfo, channelID string) {
-	fmt.Printf("  ▶ ACHIEVEMENT (%.0f/%.0f)\n", task.Done, task.Target)
+	out("  ▶ ACHIEVEMENT (%.0f/%.0f)", task.Done, task.Target)
 	if channelID == "" || channelID == "0" {
-		fmt.Printf("  → Sem voice channel. Usa --channel <id> ou entra num voice channel.\n")
+		out("  → Sem voice channel. Usa --channel <id> ou entra num voice channel.")
 	}
 	ch := channelID
 	if ch == "" {
@@ -434,13 +436,13 @@ func runAchievement(client *DiscordClient, questID string, task TaskInfo, channe
 		prog, term, err := client.SendHeartbeat(questID, streamKey)
 		if err != nil {
 			if term {
-				fmt.Printf("  ✗ %v\n", err)
+				out("  ✗ %v", err)
 				return
 			}
 			fails++
 			dbg("runAchievement: erro (try %d): %v", fails, err)
 			if fails >= 5 {
-				fmt.Printf("  ✗ ACHIEVEMENT não responde a heartbeats. Completa manualmente.\n")
+				out("  ✗ ACHIEVEMENT não responde a heartbeats. Completa manualmente.")
 				return
 			}
 			time.Sleep(5 * time.Second)
@@ -452,9 +454,11 @@ func runAchievement(client *DiscordClient, questID string, task TaskInfo, channe
 				cur = v
 			}
 		}
-		fmt.Printf("  ✓ progresso: %.0f/%.0f\n", cur, task.Target)
+		out("  ✓ progresso: %.0f/%.0f", cur, task.Target)
+		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
 		if cur >= task.Target || term {
-			fmt.Printf("  ✓ ACHIEVEMENT completo!\n")
+			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
+			out("  ✓ ACHIEVEMENT completo!")
 			return
 		}
 		time.Sleep(time.Duration(rnd(19000, 22000)) * time.Millisecond)
@@ -462,8 +466,8 @@ func runAchievement(client *DiscordClient, questID string, task TaskInfo, channe
 }
 
 func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
-	fmt.Printf("  ▶ PLAY_ON_DESKTOP (%.0f/%.0f s)\n", task.Done, task.Target)
-	fmt.Printf("  → A tentar heartbeats com stream_key\n")
+	out("  ▶ PLAY_ON_DESKTOP (%.0f/%.0f s)", task.Done, task.Target)
+	out("  → A tentar heartbeats com stream_key")
 
 	streamKey := "ineligible_platform"
 	cur := task.Done
@@ -474,14 +478,14 @@ func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 		prog, term, err := client.SendHeartbeat(questID, streamKey)
 		if err != nil {
 			if term {
-				fmt.Printf("  ✗ PLAY_ON_DESKTOP não suporta heartbeats diretos.\n")
-				fmt.Printf("  → Alternativa: Executa o jogo real ou usa injeção no cliente Discord.\n")
+				out("  ✗ PLAY_ON_DESKTOP não suporta heartbeats diretos.")
+				out("  → Alternativa: Executa o jogo real ou usa injeção no cliente Discord.")
 				return
 			}
 			fails++
 			dbg("runDesktop: erro (try %d): %v", fails, err)
 			if fails >= 3 {
-				fmt.Printf("  ✗ PLAY_ON_DESKTOP requer injeção no cliente Discord\n")
+				out("  ✗ PLAY_ON_DESKTOP requer injeção no cliente Discord")
 				return
 			}
 			time.Sleep(3 * time.Second)
@@ -493,12 +497,14 @@ func runDesktop(client *DiscordClient, questID string, task TaskInfo) {
 				cur = v
 			}
 		}
-		fmt.Printf("  ✓ %.0f/%.0f\n", cur, task.Target)
+		out("  ✓ %.0f/%.0f", cur, task.Target)
+		sendProgress(questID, "", string(task.Type), cur, task.Target, "running")
 		if cur >= task.Target || term {
-			fmt.Printf("  ✓ PLAY_ON_DESKTOP completo!\n")
+			sendProgress(questID, "", string(task.Type), cur, task.Target, "done")
+			out("  ✓ PLAY_ON_DESKTOP completo!")
 			return
 		}
 		time.Sleep(time.Duration(rnd(19000, 22000)) * time.Millisecond)
 	}
-	fmt.Printf("  → PLAY_ON_DESKTOP requer injeção no cliente Discord para funcionar\n")
+	out("  → PLAY_ON_DESKTOP requer injeção no cliente Discord para funcionar")
 }

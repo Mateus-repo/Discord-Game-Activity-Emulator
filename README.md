@@ -34,6 +34,16 @@ Aplicação **standalone** (`.exe` único) que completa automaticamente **Quests
 - Sessão iniciada no Discord pelo menos uma vez
 - *(opcional)* Go 1.22+ para compilar manualmente
 
+## Obter o Token Manualmente
+
+Se a extração automática falhar (Discord versões recentes encriptam o token), abre o Discord com **`Ctrl+Shift+I`**, vai à tab **Console** e cola:
+
+```js
+(webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())
+```
+
+Copia o output (uma string tipo `OTAyNjA2...`) e guarda num ficheiro `token.txt` ao lado do `.exe`, ou passa com `--token &lt;token&gt;`.
+
 ## Uso
 
 ```bash

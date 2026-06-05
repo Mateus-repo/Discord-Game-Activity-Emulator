@@ -7,29 +7,40 @@ import (
 )
 
 func main() {
-	var tokenFlag string
-	var questID string
-	var channelID string
-	debugPtr := flag.Bool("debug", false, "modo debug com logs detalhados (ou -d)")
-	flag.StringVar(&tokenFlag, "token", "", "token do Discord (auto se omitido)")
-	flag.StringVar(&questID, "id", "", "ID específico de quest para processar")
-	flag.StringVar(&channelID, "channel", "", "ID do voice channel para heartbeats")
+	cliMode := flag.Bool("cli", false, "modo terminal (sem GUI)")
+	debugPtr := flag.Bool("debug", false, "modo debug com logs detalhados")
+	tokenFlag := flag.String("token", "", "token do Discord (auto se omitido)")
+	questID := flag.String("id", "", "ID específico de quest para processar")
+	channelID := flag.String("channel", "", "ID do voice channel para heartbeats")
 	flag.Parse()
 
 	if *debugPtr {
 		debugMode = true
 	}
 
+	if *cliMode || *questID != "" || *tokenFlag != "" {
+		runCLI(*tokenFlag, *questID, *channelID)
+		return
+	}
+
+	startGUI()
+}
+
+func runCLI(tokenArg, questID, channelID string) {
 	fmt.Println("=== Discord Quest Emulator ===")
 	fmt.Println()
 
-	token := tokenFlag
+	token := tokenArg
 	if token == "" {
 		var err error
 		token, err = findDiscordToken()
 		if err != nil {
 			fmt.Println("✗", err)
-			fmt.Println("Fornece o token manualmente: --token SEU_TOKEN")
+			fmt.Println("\nObtém o token manualmente:")
+			fmt.Println("1. Abre Discord (Ctrl+Shift+I)")
+			fmt.Println("2. Vai à tab Console")
+			fmt.Println(`3. Cola: (webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())`)
+			fmt.Println("4. Guarda o resultado em token.txt ou usa --token <token>")
 			os.Exit(1)
 		}
 		fmt.Println("✓ Token encontrado")
@@ -55,10 +66,7 @@ func main() {
 		return
 	}
 
-	active := 0
-	completed := 0
-	claimed := 0
-	expired := 0
+	active, completed, claimed, expired := 0, 0, 0, 0
 
 	fmt.Printf("\nQuests encontradas (%d):\n", len(quests))
 	for _, q := range quests {
@@ -108,15 +116,10 @@ func main() {
 		return
 	}
 
-	// Só procura voice channel se houver quests ACTIVITY/ACHIEVEMENT e --channel não foi dado
 	if channelID == "" && hasActivityQuests(quests) {
-		dbg("main: a procurar voice channel automaticamente")
 		found := client.FindVoiceChannel()
 		if found != "" {
 			channelID = found
-			fmt.Printf("✓ Voice channel encontrado: %s\n", channelID)
-		} else {
-			fmt.Println("! Nenhum voice channel encontrado. Usa --channel <id> ou entra num voice channel.")
 		}
 	}
 
