@@ -62,20 +62,41 @@ O token é **auto-extraído** dos ficheiros locais do Discord (`%APPDATA%/discor
 
 ### Obter token manualmente
 
-Se a extração automática falhar:
+Se a extração automática falhar, abre o Discord (`Ctrl+Shift+I` > tab **Console**) e experimenta por ordem:
 
-**Método 1 (recomendado):**
-1. Abre o Discord, `Ctrl+Shift+I`
-2. Vai à tab **Application > Local Storage > discord.com**
-3. Copia o valor da chave `"token"`
+**Método 1 (iframe — recomendado):**
+```js
+const iframe = document.createElement("iframe");
+document.body.appendChild(iframe);
+const token = JSON.parse(iframe.contentWindow.localStorage.token);
+iframe.remove();
+console.log(token);
+```
 
-**Método 2 (Console):**
-1. `Ctrl+Shift+I` > tab **Console**
-2. Cola: `localStorage.getItem("token")`
-3. Se falhar, tenta o método webpack:
-   ```js
-   (webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())
-   ```
+**Método 2 (fetch interceptor — funciona sempre):**
+```js
+(function() {
+  const of = globalThis.fetch;
+  globalThis.fetch = async function(...a) {
+    const auth = new Headers(a[1]?.headers||{}).get('authorization');
+    if (auth) console.log('Token:', auth);
+    return of.apply(this, a);
+  };
+  const oo = XMLHttpRequest.prototype.open;
+  const os = XMLHttpRequest.prototype.setRequestHeader;
+  XMLHttpRequest.prototype.open = function(m, u, ...r) { this._u = u; return oo.apply(this, [m, u, ...r]); };
+  XMLHttpRequest.prototype.setRequestHeader = function(h, v) {
+    if (h.toLowerCase() === 'authorization') console.log('Token:', v);
+    return os.apply(this, [h, v]);
+  };
+})();
+// Se não aparecer logo, clica num DM para gerar tráfego
+```
+
+**Método 3 (webpack symbol):**
+```js
+window.webpackChunkdiscord_app.push([[Symbol()],{},o=>{for(let e of Object.values(o.c))try{if(!e.exports||e.exports===window)continue;if(e.exports?.getToken)console.log(e.exports.getToken());for(let o in e.exports)e.exports?.[o]?.getToken&&"IntlMessagesProxy"!==e.exports[o][Symbol.toStringTag]&&console.log(e.exports[o].getToken())}catch{}}]),window.webpackChunkdiscord_app.pop();
+```
 
 Guarda o resultado em `token.json`: `{"token": "o-teu-token"}` ou usa `--token <token>`
 
