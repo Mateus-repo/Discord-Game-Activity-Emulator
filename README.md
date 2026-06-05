@@ -1,103 +1,117 @@
 # Discord Quest Emulator
 
-Aplicação **standalone** (`.exe` único) que completa automaticamente **Quests do Discord** que recompensam **Orbs**, sem precisar instalar ou abrir os jogos reais.
+Completa automaticamente **Quests do Discord** que recompensam **Orbs** — sem precisar instalar ou abrir os jogos reais.
 
----
+Standalone `.exe`, sem dependências.
 
 ## Funcionalidades
 
 - ✅ **WATCH_VIDEO** — envia progresso de visualização direto à API
-- ✅ **PLAY_ACTIVITY** — envia heartbeats com `stream_key`
-- ✅ **PLAY_ON_DESKTOP** — corre um processo dummy com o nome do jogo para o Discord detetar
-- ✅ **Auto-enroll** — inscreve-te automaticamente nas quests
+- ✅ **PLAY_ACTIVITY** — heartbeats com `stream_key`
+- ✅ **PLAY_ON_DESKTOP** — heartbeats diretos via API (com `application_id` + `executable_path`)
+- ✅ **ACHIEVEMENT_IN_ACTIVITY** — heartbeat com progresso manual
+- ✅ **Auto-enroll** — inscreve-se automaticamente nas quests
 - ✅ **Auto-claim** — reclama a recompensa quando completa
-- ✅ **Extração automática do token** — lê dos ficheiros do Discord
-- ✅ **CLI simples** — corre tudo ou escolhe uma quest específica
+- ✅ **Extração automática do token** — lê dos ficheiros do Discord (ou manual com `--token`)
+- ✅ **Pronto para qualquer PC** — só copiar o `.exe`, o token é auto-extraído e guardado em `token.json`
 - ❌ **STREAM_ON_DESKTOP** — não suportado (requer injeção no cliente)
 
 ## Como funciona
 
-1. Extrai o teu token de autenticação dos ficheiros locais do Discord
-2. Consulta `GET /users/@me/quests` para obter as quests ativas
-3. Para cada quest:
-   - Faz **enroll** se ainda não estiveres inscrito
-   - Detecta o tipo de tarefa (WATCH_VIDEO, PLAY_ACTIVITY, PLAY_ON_DESKTOP, etc.)
-   - Executa a estratégia adequada:
-     - **WATCH_VIDEO**: `POST /quests/{id}/video-progress` com timestamps crescentes
-     - **PLAY_ACTIVITY**: `POST /quests/{id}/heartbeat` com `stream_key` `call:channelId:1`
-     - **PLAY_ON_DESKTOP**: copia o próprio `.exe` para `games/<appID>/<exeName>.exe`, lança-o em background, e o Discord detecta-o como o jogo real a correr — os heartbeats são enviados automaticamente pelo cliente Discord
-4. Quando completa, faz **claim** automático da recompensa
+1. Extrai o token de autenticação dos ficheiros locais do Discord (ou usa `--token`)
+2. Consulta `GET /users/@me/quests` para listar as quests ativas
+3. Para cada quest faz enroll, processa as tarefas e faz claim automático
+4. **PLAY_ON_DESKTOP**: envia heartbeats diretos (`POST /quests/{id}/heartbeat`) com a mesma estrutura que o cliente Discord usa — sem precisar de processos dummy ou jogos instalados
 
-## Pré-requisitos
-
-- Windows (funciona com Discord estável, canary ou PTB)
-- Sessão iniciada no Discord pelo menos uma vez
-- *(opcional)* Go 1.22+ para compilar manualmente
-
-## Obter o Token Manualmente
-
-Se a extração automática falhar (Discord versões recentes encriptam o token), abre o Discord com **`Ctrl+Shift+I`**, vai à tab **Console** e cola:
-
-```js
-(webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())
-```
-
-Copia o output (uma string tipo `OTAyNjA2...`) e guarda num ficheiro `token.txt` ao lado do `.exe`, ou passa com `--token &lt;token&gt;`.
-
-## Uso
+## Uso rápido
 
 ```bash
-# Corre todas as quests ativas
+# Corre tudo (lista quests, processa ativas, faz claim)
 discord-quest-emulator.exe
 
-# Corre uma quest específica (pelo ID)
-discord-quest-emulator.exe --id <quest_id>
+# Modo CLI (sem GUI)
+discord-quest-emulator.exe --cli
 
-# Fornecer token manualmente (se a extração automática falhar)
-discord-quest-emulator.exe --token <seu_token>
+# Apenas uma quest específica
+discord-quest-emulator.exe --cli --id <quest_id>
+
+# Fornecer token manualmente
+discord-quest-emulator.exe --token <token>
+
+# Verboso (debug)
+discord-quest-emulator.exe --cli --debug
 ```
 
-### Exemplo de output
+## Flags
+
+| Flag | Descrição |
+|------|-----------|
+| `--cli` | Modo terminal (sem GUI) |
+| `--id <id>` | Processar apenas uma quest específica |
+| `--token <token>` | Fornecer token manualmente |
+| `--channel <id>` | ID do voice channel para PLAY_ACTIVITY |
+| `--debug` | Logs detalhados |
+| `--print-token` | Verificar token e mostrar conta associada |
+| `--stop-desktop <q,a,e>` | Enviar heartbeat terminal para uma quest PLAY_ON_DESKTOP (formato: `questID,appID,exePath`) |
+
+## Sobre o token
+
+O token é **auto-extraído** dos ficheiros locais do Discord (`%APPDATA%/discord/Local Storage/leveldb/`). Quando encontrado, é guardado em `token.json` (formato `{"token": "...", "account": "..."}`) para usar de imediato nas próximas execuções.
+
+`token.json` está no `.gitignore` — nunca é commitado.
+
+### Obter token manualmente
+
+Se a extração automática falhar:
+
+1. Abre o Discord, carrega `Ctrl+Shift+I`, vai à tab **Console**
+2. Cola um dos comandos abaixo:
+
+```js
+// Método 1 (webpack)
+(webpackChunkdiscord_app.push([[''],{},e=>{m=[];for(let c in e.c)m.push(e.c[c])}]),m.map(m=>m.exports).filter(x=>x?.default?.getToken?.())[0]?.default?.getToken?.())
+
+// Método 2 (alternativo)
+(function(){const w=webpackChunkdiscord_app.push([[],{},r=>r]);delete w.default;const m=Object.values(w.c).find(m=>m?.exports?.default?.getToken);return m?.exports?.default?.getToken()})()
+```
+
+3. Guarda o resultado em `token.json`: `{"token": "o-teu-token"}` ou usa `--token <token>`
+
+## Exemplo de output
 
 ```
 === Discord Quest Emulator ===
 
 ✓ Token encontrado
-✓ Autenticado como User#1234
+✓ Autenticado como Strefiz
 
 Quests encontradas (2):
-  • EAFC x The World's Game [WATCH_VIDEO 0/600, PLAY_ON_DESKTOP 0/1800]
+  • Version Update: Mi Fu [PLAY_ON_DESKTOP 122/900, PLAY_ON_DESKTOP 122/900]
+  • A Odisseia [ACHIEVEMENT_IN_ACTIVITY 0/1]
 
-A processar quests...
-
-▶ "EAFC x The World's Game"
-  → A inscrever na quest...
-  ✓ Inscrito!
-  ▶ VIDEO (0/600 s)
-  ✓ 30/600 (5%)
-  ✓ 60/600 (10%)
-  ...
-  ✓ VIDEO completo!
-  ▶ DESKTOP (0/1800 s)
-  ✓ A correr processo dummy: games/122131413312612/eafc.exe
-  ✓ 15/1800 (1%)
-  ✓ 30/1800 (2%)
+▶ "Version Update: Mi Fu"
+  ▶ DESKTOP (122/900 s)
+  ✓ 142/900 (16%)
+  ✓ 162/900 (18%)
   ...
   ✓ DESKTOP completo!
   → A reclamar recompensa...
   ✓ Recompensa reclamada!
-  ✓ Processo dummy terminado
-
-Concluído! Verifica o progresso no Discord.
 ```
 
 ## Compilar
 
+Requer Go 1.22+ e MinGW-w64 (para CGO).
+
 ```bash
-git clone <repo>
-cd discord-quest-emulator
+git clone https://github.com/Mateus-repo/Discord-Game-Activity-Emulator.git
+cd Discord-Game-Activity-Emulator
 build.bat
 ```
+
+## Script de captura
+
+O `capturar-comunicacao.bat` abre o Discord com debugging para capturar o tráfego HAR — útil se quiseres inspecionar os pedidos que o cliente faz.
 
 ## ⚠️ Aviso Legal
 

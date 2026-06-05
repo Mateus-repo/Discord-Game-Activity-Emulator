@@ -18,7 +18,10 @@ tmp/
 
 # Token file
 token.json
+token.txt
+
+# HAR capture / temp scripts
 discord.com.har
+analyze_*.py
 Copy
 Sair
-analyze_har.py

@@ -48,14 +48,13 @@
 - [ ] Cor e formatação melhorada
 
 ## Fase 6: Build e Distribuição
-- [ ] Script de build para Windows (build.bat)
+- [x] Script de build para Windows (build.bat)
 - [x] Testar compilação (go vet ok, build ok)
-- [ ] Testar em ambiente real
-- [ ] Documentar limitações conhecidas
+- [x] Testar em ambiente real (PLAY_ON_DESKTOP funcional)
+- [x] README atualizado para público
 - [ ] Criar release no GitHub
 
 ## Ideias Futuras
 - [ ] Suporte a Linux/macOS (ler token de locais diferentes)
-- [ ] Injeção de DLL ou processo falso para PLAY_ON_DESKTOP
 - [ ] Serviço em background (system tray)
 - [ ] TUI interativa com bubbletea
