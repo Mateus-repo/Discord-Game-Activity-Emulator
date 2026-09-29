@@ -186,7 +186,12 @@ func (g *gui) onRefresh() {
 func (g *gui) auth() (*DiscordClient, error) {
 	token, err := findDiscordToken()
 	if err != nil {
-		return nil, fmt.Errorf(`token não encontrado.
+		return nil, fmt.Errorf(`%s
+
+Para não teres de fazer isto à mão: se o Discord estiver aberto neste PC,
+o token é encontrado automaticamente.
+
+Obter o token manualmente:
 
 1. Abre o Discord, Ctrl+Shift+I > tab Console
 2. Cola o seguinte e pressiona Enter:
@@ -208,7 +213,9 @@ func (g *gui) auth() (*DiscordClient, error) {
 })()
 
 3. Clica num DM para gerar tráfego — o token aparece na Console
-4. Guarda em token.json: {"token": "o-teu-token"} e reabre o programa`)
+4. Cria um ficheiro chamado token.txt (tem de ser mesmo .txt, não .txt.txt)
+   na MESMA pasta do .exe, e lá dentro escreve só o token. Fecha-o e
+   clica em "Atualizar".`, err)
 	}
 	client := NewDiscordClient(token)
 	if err := client.Verify(); err != nil {
